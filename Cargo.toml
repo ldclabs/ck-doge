@@ -1,0 +1,3 @@
+[workspace]
+members = ["src/ck-doge-canister"]
+resolver = "2"

@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "ck-doge-backend": {
+      "candid": "src/ck-doge-canister/ck-doge-canister.did",
+      "package": "ck-doge-canister",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
