@@ -9,6 +9,9 @@ lint:
 fix:
 	@cargo clippy --fix --workspace --tests
 
+test:
+	@cargo test --workspace -- --nocapture
+
 # cargo install ic-wasm
 build-wasm:
 	cargo build --release --target wasm32-unknown-unknown --package ck-doge-canister

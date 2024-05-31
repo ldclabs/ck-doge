@@ -1,3 +1,24 @@
 [workspace]
-members = ["src/ck-doge-canister"]
+members = ["src/ck-doge-canister", "src/ck-doge-types"]
 resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+repository = "https://github.com/ldclabs/ck-doge"
+keywords = ["defi", "dogecoin", "icp", "dapp", "web3"]
+categories = ["blockchain", "web3"]
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+serde = "1"
+serde_json = "1"
+serde_bytes = "0.11"
+ciborium = "0.2"
+k256 = { version = "0.13", features = ["ecdsa"] }
+base64 = "0.21"
+sha3 = "0.10"
+bitcoin = "0.32"
+hex = { package = "hex-conservative", version = "0.2", default-features = false, features = [
+  "alloc",
+] }

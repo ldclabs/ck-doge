@@ -1,0 +1,24 @@
+[package]
+name = "ck-doge-types"
+publish = true
+
+version.workspace = true
+edition.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[lib]
+
+[features]
+default = []
+serde = []
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_bytes = { workspace = true }
+ciborium = { workspace = true }
+bitcoin = { workspace = true }
+hex = { workspace = true }
+bitcoin-io = "0.1"
