@@ -1,5 +1,6 @@
 [package]
 name = "ck-doge-types"
+description = "Types for dogecoin chain data"
 publish = true
 
 version.workspace = true
