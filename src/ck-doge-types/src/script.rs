@@ -7,16 +7,34 @@ use crate::opcodes::*;
 
 // Dogecoin Script Types enum.
 // Inferred from ScriptPubKey scripts by pattern-matching the code (script templates)
-pub type ScriptType = &'static str;
+// https://github.com/dogecoin/dogecoin/blob/master/src/script/standard.cpp#L24
+#[derive(Clone, PartialEq, Eq, Debug, Hash, Default)]
+pub enum ScriptType {
+    #[default]
+    NonStandard,
+    PubKey,
+    PubKeyHash,
+    ScriptHash,
+    MultiSig,
+    NullData,
+    WitnessV0KeyHash,
+    WitnessV0ScriptHash,
+}
 
-pub static SCRIPT_TYPE_P2PK: ScriptType = "p2pk"; // TX_PUBKEY (in Core)
-pub static SCRIPT_TYPE_P2PKH: ScriptType = "p2pkh"; // TX_PUBKEYHASH
-pub static SCRIPT_TYPE_P2PKHW: ScriptType = "p2wpkh"; // TX_WITNESS_V0_KEYHASH
-pub static SCRIPT_TYPE_P2SH: ScriptType = "p2sh"; // TX_SCRIPTHASH
-pub static SCRIPT_TYPE_P2SHW: ScriptType = "p2wsh"; // TX_WITNESS_V0_SCRIPTHASH
-pub static SCRIPT_TYPE_MULTISIG: ScriptType = "multisig"; // TX_MULTISIG
-pub static SCRIPT_TYPE_NULLDATA: ScriptType = "nulldata"; // TX_NULL_DATA
-pub static SCRIPT_TYPE_CUSTOM: ScriptType = "custom"; // TX_NONSTANDARD
+impl std::fmt::Display for ScriptType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ScriptType::NonStandard => write!(f, "nonstandard"),
+            ScriptType::PubKey => write!(f, "pubkey"),
+            ScriptType::PubKeyHash => write!(f, "pubkeyhash"),
+            ScriptType::ScriptHash => write!(f, "scripthash"),
+            ScriptType::MultiSig => write!(f, "multisig"),
+            ScriptType::NullData => write!(f, "nulldata"),
+            ScriptType::WitnessV0KeyHash => write!(f, "witness_v0_keyhash"),
+            ScriptType::WitnessV0ScriptHash => write!(f, "witness_v0_scripthash"),
+        }
+    }
+}
 
 pub const ECPRIV_KEY_LEN: usize = 32; // bytes.
 pub const ECPUB_KEY_COMPRESSED_LEN: usize = 33; // bytes: [x02/x03][32-X] 2=even 3=odd
@@ -110,25 +128,25 @@ pub fn classify_script(script: &[u8], chain: &ChainParams) -> (ScriptType, Optio
         && script[24] == OP_CHECKSIG
     {
         let addr = hash160_to_address(&script[3..23], chain.p2pkh_address_prefix);
-        return (SCRIPT_TYPE_P2PKH, Some(addr));
+        return (ScriptType::PubKeyHash, Some(addr));
     }
 
     // P2PK: <compressedPubKey:33> OP_CHECKSIG
     if l == 35 && script[0] == 33 && script[34] == OP_CHECKSIG {
         // no Base58 Address for P2PK.
-        return (SCRIPT_TYPE_P2PK, None);
+        return (ScriptType::PubKey, None);
     }
 
     // P2PK: <uncompressedPubKey:65> OP_CHECKSIG
     if l == 67 && script[0] == 65 && script[66] == OP_CHECKSIG {
         // no Base58 Address for P2PK.
-        return (SCRIPT_TYPE_P2PK, None);
+        return (ScriptType::PubKey, None);
     }
 
     // P2SH: OP_HASH160 0x14 <hash> OP_EQUAL
     if l == 23 && script[0] == OP_HASH160 && script[1] == 20 && script[22] == OP_EQUAL {
         let addr = hash160_to_address(&script[2..22], chain.p2sh_address_prefix);
-        return (SCRIPT_TYPE_P2SH, Some(addr));
+        return (ScriptType::ScriptHash, Some(addr));
     }
 
     // OP_m <pubkey*n> OP_n OP_CHECKMULTISIG
@@ -154,18 +172,18 @@ pub fn classify_script(script: &[u8], chain: &ChainParams) -> (ScriptType, Optio
         }
 
         if ofs == end_keys && num_keys == 0 {
-            return (SCRIPT_TYPE_MULTISIG, None);
+            return (ScriptType::MultiSig, None);
         }
 
-        return (SCRIPT_TYPE_CUSTOM, None);
+        return (ScriptType::NonStandard, None);
     }
 
     // OP_RETURN
     if l > 0 && script[0] == OP_RETURN {
-        return (SCRIPT_TYPE_NULLDATA, None);
+        return (ScriptType::NullData, None);
     }
 
-    (SCRIPT_TYPE_CUSTOM, None)
+    (ScriptType::NonStandard, None)
 }
 
 fn is_op_n1(op: u8) -> bool {

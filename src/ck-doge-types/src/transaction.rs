@@ -10,9 +10,6 @@ use std::ops::Deref;
 
 use crate::{consensus_decode_from_vec, consensus_encode_vec};
 
-// #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-// pub struct Txid(sha256d::Hash);
-
 hash_newtype! {
     pub struct Txid(sha256d::Hash);
 }
@@ -330,7 +327,7 @@ mod tests {
     use std::str::FromStr;
 
     use crate::chainparams::DOGE_MAIN_NET_CHAIN;
-    use crate::script::{classify_script, SCRIPT_TYPE_P2PKH};
+    use crate::script::{classify_script, ScriptType};
 
     #[test]
     fn test_transaction() {
@@ -340,10 +337,15 @@ mod tests {
         let tx = Transaction::consensus_decode_from_finite_reader(&mut rd).unwrap();
         println!("input: {}, output: {}", tx.input.len(), tx.output.len());
 
+        let mut buf = Vec::new();
+        tx.consensus_encode(&mut buf).unwrap();
+        assert_eq!(buf, data);
+
         assert_eq!(
             tx.compute_txid().to_string(),
             "81b2035be1da1abe745c6141174a73d151009ec17b3d5ebffa2e177408c50dfd"
         );
+
         assert_eq!(tx.version, 1);
         assert_eq!(tx.lock_time, 0);
         let input = vec![TxIn{
@@ -613,7 +615,7 @@ mod tests {
         println!("script: {:?}", s);
 
         let (script_type, addr) = classify_script(s.as_bytes(), &DOGE_MAIN_NET_CHAIN);
-        assert_eq!(script_type, SCRIPT_TYPE_P2PKH);
+        assert_eq!(script_type, ScriptType::PubKeyHash);
         assert_eq!(
             addr.unwrap().to_string(),
             "DJFXow7CYcBWKVjwe1VH4or5f6YetLH1hw"
@@ -623,7 +625,7 @@ mod tests {
             &hex!("76a9146c772e9cf96371bba3da8cb733da70a2fcf2007888ac"),
             &DOGE_MAIN_NET_CHAIN,
         );
-        assert_eq!(script_type, SCRIPT_TYPE_P2PKH);
+        assert_eq!(script_type, ScriptType::PubKeyHash);
         assert_eq!(
             addr.unwrap().to_string(),
             "DF2cHtiK4xeXPUBhMdK7XWU5UNYSg2KFvt"

@@ -315,6 +315,10 @@ mod tests {
 
         // println!("Block root: {:?}", blk.auxpow);
 
+        let mut buf = Vec::new();
+        blk.consensus_encode(&mut buf).unwrap();
+        assert_eq!(buf, data);
+
         assert_eq!(
             blk.block_hash().to_string(),
             "fb5f5b5b7d70e660c2c67bca8d3328afae32ae8bb4c8d6cbc42d96ff876b0859"
