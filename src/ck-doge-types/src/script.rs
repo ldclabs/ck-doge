@@ -5,6 +5,8 @@ use std::str::FromStr;
 use crate::chainparams::ChainParams;
 use crate::opcodes::*;
 
+pub use bitcoin::script::{Bytes, PushBytes, Script, ScriptBuf, ScriptHash};
+
 // Dogecoin Script Types enum.
 // Inferred from ScriptPubKey scripts by pattern-matching the code (script templates)
 // https://github.com/dogecoin/dogecoin/blob/master/src/script/standard.cpp#L24
@@ -92,22 +94,22 @@ pub fn hash160_to_address(hash: &[u8], prefix: u8) -> Address {
     addr
 }
 
-pub fn pubkey_to_p2pkh(key: &[u8], chain: &ChainParams) -> Result<Address, String> {
-    if !((key.len() == ECPUB_KEY_UNCOMPRESSED_LEN && key[0] == 0x04)
-        || (key.len() == ECPUB_KEY_COMPRESSED_LEN && (key[0] == 0x02 || key[0] == 0x03)))
+pub fn p2pkh_address(pubkey: &[u8], chain: &ChainParams) -> Result<Address, String> {
+    if !((pubkey.len() == ECPUB_KEY_UNCOMPRESSED_LEN && pubkey[0] == 0x04)
+        || (pubkey.len() == ECPUB_KEY_COMPRESSED_LEN && (pubkey[0] == 0x02 || pubkey[0] == 0x03)))
     {
-        return Err("pubkey_to_p2pkh: invalid pubkey".to_string());
+        return Err("p2pkh_address: invalid pubkey".to_string());
     }
-    let payload = hash160::Hash::hash(key);
+    let payload = hash160::Hash::hash(pubkey);
     Ok(hash160_to_address(
         payload.as_ref(),
         chain.p2pkh_address_prefix,
     ))
 }
 
-pub fn script_to_p2sh(script: &[u8], chain: &ChainParams) -> Result<Address, String> {
+pub fn p2sh_address(script: &[u8], chain: &ChainParams) -> Result<Address, String> {
     if script.is_empty() {
-        return Err("script_to_p2sh: bad script length".to_string());
+        return Err("p2sh_address: bad script length".to_string());
     }
 
     let payload = hash160::Hash::hash(script);

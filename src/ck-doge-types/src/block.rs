@@ -304,6 +304,7 @@ impl From<&Block> for BlockHash {
 mod tests {
     use super::*;
     use hex::test_hex_unwrap as hex;
+    use hex::DisplayHex;
 
     #[test]
     fn test_block() {
@@ -368,5 +369,17 @@ mod tests {
                 1045842885
             ]
         );
+
+        for (j, tx) in blk.txdata.iter().enumerate() {
+            for (i, inp) in tx.input.iter().enumerate() {
+                let script = inp.script.clone();
+                println!("Input {}-{}: {} {:?}", j, i, inp.prevout.vout, script);
+            }
+            println!("Tx: {}", tx.to_bytes().as_hex());
+            // for (i, out) in tx.output.iter().enumerate() {
+            //     let script = ScriptBuf::from(out.script.clone());
+            //     println!("Output {}-{}: {} {:?}", j, i, out.value, script);
+            // }
+        }
     }
 }

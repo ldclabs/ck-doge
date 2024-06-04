@@ -4,6 +4,7 @@
 
 use bitcoin::consensus::{encode, Decodable, Encodable};
 use bitcoin::hashes::{hash_newtype, sha256d, Hash};
+use bitcoin::ScriptBuf;
 use bitcoin_io::{BufRead, Error, Write};
 use core::cmp;
 use std::ops::Deref;
@@ -46,7 +47,7 @@ impl Decodable for Txid {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OutPoint {
     /// The referenced transaction's txid.
@@ -120,7 +121,7 @@ impl Decodable for Witness {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TxIn {
     pub prevout: OutPoint,
-    pub script: Vec<u8>,
+    pub script: ScriptBuf,
     pub sequence: u32,
     pub witness: Witness, // Only Serialize & Deserialize through Transaction
 }
@@ -136,7 +137,7 @@ impl Default for TxIn {
     fn default() -> TxIn {
         TxIn {
             prevout: OutPoint::default(),
-            script: Vec::new(),
+            script: ScriptBuf::new(),
             sequence: u32::MAX,
             witness: Witness::default(),
         }
@@ -171,14 +172,14 @@ impl Decodable for TxIn {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TxOut {
     pub value: u64,
-    pub script: Vec<u8>,
+    pub script: ScriptBuf,
 }
 
 impl Default for TxOut {
     fn default() -> TxOut {
         TxOut {
             value: u64::MAX,
-            script: Vec::new(),
+            script: ScriptBuf::new(),
         }
     }
 }
@@ -281,6 +282,12 @@ impl Transaction {
     pub fn is_coinbase(&self) -> bool {
         self.input.len() == 1 && self.input[0].prevout.is_null()
     }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.consensus_encode(&mut buf).unwrap();
+        buf
+    }
 }
 
 impl Encodable for Transaction {
@@ -307,6 +314,15 @@ impl Decodable for Transaction {
     }
 }
 
+impl TryFrom<&[u8]> for Transaction {
+    type Error = encode::Error;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let mut rd = data;
+        Self::consensus_decode_from_finite_reader(&mut rd)
+    }
+}
+
 impl From<Transaction> for Txid {
     fn from(tx: Transaction) -> Txid {
         tx.compute_txid()
@@ -322,8 +338,7 @@ impl From<&Transaction> for Txid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bitcoin::script::ScriptBuf;
-    use hex::{test_hex_unwrap as hex, DisplayHex};
+    use hex::test_hex_unwrap as hex;
     use std::str::FromStr;
 
     use crate::chainparams::DOGE_MAIN_NET_CHAIN;
@@ -355,7 +370,7 @@ mod tests {
                     ).unwrap(),
                     vout: 332,
                 },
-                script: hex!("493046022100b4251ecd63778a3dde0155abe4cd162947620ae9ee45a874353551092325b116022100db307baf4ff3781ec520bd18f387948cedd15dc27bafe17c894b0fe6ffffcafa012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("493046022100b4251ecd63778a3dde0155abe4cd162947620ae9ee45a874353551092325b116022100db307baf4ff3781ec520bd18f387948cedd15dc27bafe17c894b0fe6ffffcafa012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -366,7 +381,7 @@ mod tests {
                     ).unwrap(),
                     vout: 1,
                 },
-                script: hex!("473044022079bd62ee09621a3be96b760c39e8ef78170101d46313923c6b07ae60a95c90670220238e51ea29fc70b04b65508450523caedbb11cb4dd5aa608c81487de798925ba0121027a759be8df971a6a04fafcb4f6babf75dc811c5cdaa0734cddbe9b942ce75b34"),
+                script: ScriptBuf::from_hex("473044022079bd62ee09621a3be96b760c39e8ef78170101d46313923c6b07ae60a95c90670220238e51ea29fc70b04b65508450523caedbb11cb4dd5aa608c81487de798925ba0121027a759be8df971a6a04fafcb4f6babf75dc811c5cdaa0734cddbe9b942ce75b34").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -377,7 +392,7 @@ mod tests {
                     ).unwrap(),
                     vout: 209,
                 },
-                script: hex!("48304502207722d6f9038673c86a1019b1c4de2d687ae246477cd4ca7002762be0299de385022100e594a11e3a313942595f7666dcf7078bcb14f1330f4206b95c917e7ec0e82fac012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("48304502207722d6f9038673c86a1019b1c4de2d687ae246477cd4ca7002762be0299de385022100e594a11e3a313942595f7666dcf7078bcb14f1330f4206b95c917e7ec0e82fac012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -388,7 +403,7 @@ mod tests {
                     ).unwrap(),
                     vout: 0,
                 },
-                script: hex!("483045022100a63a4788027b79b65c6f9d9e054f68cf3b4eed19efd82a2d53f70dcbe64683390220526f243671425b2bd05745fcf2729361f985cfe84ea80c7cfc817b93d8134374012103a621f08be22d1bbdcbe4e527ee4927006aa555fc65e2aafa767d4ea2fe9dfa52"),
+                script: ScriptBuf::from_hex("483045022100a63a4788027b79b65c6f9d9e054f68cf3b4eed19efd82a2d53f70dcbe64683390220526f243671425b2bd05745fcf2729361f985cfe84ea80c7cfc817b93d8134374012103a621f08be22d1bbdcbe4e527ee4927006aa555fc65e2aafa767d4ea2fe9dfa52").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -399,7 +414,7 @@ mod tests {
                     ).unwrap(),
                     vout: 1,
                 },
-                script: hex!("493046022100b200ac6db16842f76dab9abe807ce423c992805879bc50abd46ed8275a59d9cf022100c0d518e85dd345b3c29dd4dc47b9a420d3ce817b18720e94966d2fe23413a408012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("493046022100b200ac6db16842f76dab9abe807ce423c992805879bc50abd46ed8275a59d9cf022100c0d518e85dd345b3c29dd4dc47b9a420d3ce817b18720e94966d2fe23413a408012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -410,7 +425,7 @@ mod tests {
                     ).unwrap(),
                     vout: 0,
                 },
-                script: hex!("483045022100ededc441c3103a6f2bd6cab7639421af0f6ec5e60503bce1e603cf34f00aee1c02205cb75f3f519a13fb348783b21db3085cb5ec7552c59e394fdbc3e1feea43f967012103a621f08be22d1bbdcbe4e527ee4927006aa555fc65e2aafa767d4ea2fe9dfa52"),
+                script: ScriptBuf::from_hex("483045022100ededc441c3103a6f2bd6cab7639421af0f6ec5e60503bce1e603cf34f00aee1c02205cb75f3f519a13fb348783b21db3085cb5ec7552c59e394fdbc3e1feea43f967012103a621f08be22d1bbdcbe4e527ee4927006aa555fc65e2aafa767d4ea2fe9dfa52").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -421,7 +436,7 @@ mod tests {
                     ).unwrap(),
                     vout: 21,
                 },
-                script: hex!("483045022100d9eed5413d2a4b4b98625aa6e3169edc4fb4663e7862316d69224454e70cd8ca022061e506521d5ced51dd0ea36496e75904d756a4c4f9fb111568555075d5f68d9a012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("483045022100d9eed5413d2a4b4b98625aa6e3169edc4fb4663e7862316d69224454e70cd8ca022061e506521d5ced51dd0ea36496e75904d756a4c4f9fb111568555075d5f68d9a012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -432,7 +447,7 @@ mod tests {
                     ).unwrap(),
                     vout: 9,
                 },
-                script: hex!("48304502207e84b27139c4c19c828cb1e30c349bba88e4d9b59be97286960793b5ddc0a2af0221008cdc7a951e7f31c20953ed5635fbabf228e80b7047f32faaa0313e7693005177012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("48304502207e84b27139c4c19c828cb1e30c349bba88e4d9b59be97286960793b5ddc0a2af0221008cdc7a951e7f31c20953ed5635fbabf228e80b7047f32faaa0313e7693005177012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -443,7 +458,7 @@ mod tests {
                     ).unwrap(),
                     vout: 30,
                 },
-                script: hex!("4730440220426540dfed9c4ab5812e5f06df705b8bcf307dd7d20f7fa6512298b2a6314f420220064055096e3ca62f6c7352c66a5447767c53f946acdf35025ab3807ddb2fa404012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("4730440220426540dfed9c4ab5812e5f06df705b8bcf307dd7d20f7fa6512298b2a6314f420220064055096e3ca62f6c7352c66a5447767c53f946acdf35025ab3807ddb2fa404012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -454,7 +469,7 @@ mod tests {
                     ).unwrap(),
                     vout: 114,
                 },
-                script: hex!("47304402200a5e673996f2fc88e21cc8613611f08a650bc0370338803591d85d0ec5663764022040b6664a0d1ec83a7f01975b8fde5232992b8ca58bf48af6725d2f92a936ab2e012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("47304402200a5e673996f2fc88e21cc8613611f08a650bc0370338803591d85d0ec5663764022040b6664a0d1ec83a7f01975b8fde5232992b8ca58bf48af6725d2f92a936ab2e012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -465,7 +480,7 @@ mod tests {
                     ).unwrap(),
                     vout: 103,
                 },
-                script: hex!("493046022100d93b30219c5735f673be5c3b4688366d96f545561c74cb62c6958c00f6960806022100ec8200adcb028f2184fa2a4f6faac7f8bb57cb4503bb7584ac11051fece31b3d012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("493046022100d93b30219c5735f673be5c3b4688366d96f545561c74cb62c6958c00f6960806022100ec8200adcb028f2184fa2a4f6faac7f8bb57cb4503bb7584ac11051fece31b3d012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -476,7 +491,7 @@ mod tests {
                     ).unwrap(),
                     vout: 1,
                 },
-                script: hex!("483045022100a13934e68d3f5b22b130c4cb33f4da468cffc52323a47fbfbe06b64858162246022047081e0a70ff770e64a2e2d31e5d520d9102268b57a47009a72fe73ec766901801210234b9d9413f247bb78cd3293b7b65a2c38018ba5621ea9ee737f3a6a3523fb4cd"),
+                script: ScriptBuf::from_hex("483045022100a13934e68d3f5b22b130c4cb33f4da468cffc52323a47fbfbe06b64858162246022047081e0a70ff770e64a2e2d31e5d520d9102268b57a47009a72fe73ec766901801210234b9d9413f247bb78cd3293b7b65a2c38018ba5621ea9ee737f3a6a3523fb4cd").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -487,7 +502,7 @@ mod tests {
                     ).unwrap(),
                     vout: 0,
                 },
-                script: hex!("49304602210097f1f35d5bdc1a3a60390a1b015b8e7c4f916aa3847aafd969e04975e15bbe70022100a9052eb25517d481f1fda1b129eb1b534da50ea1a51f3ee012dca3601c11b86a0121027a759be8df971a6a04fafcb4f6babf75dc811c5cdaa0734cddbe9b942ce75b34"),
+                script: ScriptBuf::from_hex("49304602210097f1f35d5bdc1a3a60390a1b015b8e7c4f916aa3847aafd969e04975e15bbe70022100a9052eb25517d481f1fda1b129eb1b534da50ea1a51f3ee012dca3601c11b86a0121027a759be8df971a6a04fafcb4f6babf75dc811c5cdaa0734cddbe9b942ce75b34").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -498,7 +513,7 @@ mod tests {
                     ).unwrap(),
                     vout: 221,
                 },
-                script: hex!("483045022012b3138c591bf7154b6fef457f2c4a3c7162225003788ac0024a99355865ff13022100b71b125ae1ffb2e1d1571f580cd3ebc8cd049a2d7a8a41f138ba94aeb982106f012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("483045022012b3138c591bf7154b6fef457f2c4a3c7162225003788ac0024a99355865ff13022100b71b125ae1ffb2e1d1571f580cd3ebc8cd049a2d7a8a41f138ba94aeb982106f012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -509,7 +524,7 @@ mod tests {
                     ).unwrap(),
                     vout: 1,
                 },
-                script: hex!("483045022100f834ccc8b22ee72712a3e5e6ef4acb8b2fb791b5385b70e2cd4332674d6667f4022024fbda0a997e0c253503f217501f508a4d56edce2c813ecdd9ad796dbeba907401210234b9d9413f247bb78cd3293b7b65a2c38018ba5621ea9ee737f3a6a3523fb4cd"),
+                script: ScriptBuf::from_hex("483045022100f834ccc8b22ee72712a3e5e6ef4acb8b2fb791b5385b70e2cd4332674d6667f4022024fbda0a997e0c253503f217501f508a4d56edce2c813ecdd9ad796dbeba907401210234b9d9413f247bb78cd3293b7b65a2c38018ba5621ea9ee737f3a6a3523fb4cd").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -520,7 +535,7 @@ mod tests {
                     ).unwrap(),
                     vout: 27,
                 },
-                script: hex!("48304502203b2fd1e39ae0e469d7a15768f262661b0de41470daf0fe8c4fd0c26542a0870002210081c57e331f9a2d214457d953e3542904727ee412c63028113635d7224da3dccc012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("48304502203b2fd1e39ae0e469d7a15768f262661b0de41470daf0fe8c4fd0c26542a0870002210081c57e331f9a2d214457d953e3542904727ee412c63028113635d7224da3dccc012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -531,7 +546,7 @@ mod tests {
                     ).unwrap(),
                     vout: 1095,
                 },
-                script: hex!("48304502206947a9c54f0664ece4430fd4ae999891dc50bb6126bc36b6a15a3189f29d25e9022100a86cfc4e2fdd9e39a20e305cfd1b76509c67b3e313e0f118229105caa0e823c9012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("48304502206947a9c54f0664ece4430fd4ae999891dc50bb6126bc36b6a15a3189f29d25e9022100a86cfc4e2fdd9e39a20e305cfd1b76509c67b3e313e0f118229105caa0e823c9012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -542,7 +557,7 @@ mod tests {
                     ).unwrap(),
                     vout: 37,
                 },
-                script: hex!("483045022100c7128fe10b2d38744ae8177776054c29fc8ec13f07207723e70766ab7164847402201d2cf09009b9596de74c0183d1ab832e5edddb7a9965880bb400097e850850f8012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("483045022100c7128fe10b2d38744ae8177776054c29fc8ec13f07207723e70766ab7164847402201d2cf09009b9596de74c0183d1ab832e5edddb7a9965880bb400097e850850f8012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -553,7 +568,7 @@ mod tests {
                     ).unwrap(),
                     vout: 20,
                 },
-                script: hex!("48304502203b89a71628a28cc3703d170ca3be77786cff6b867e38a18b719705f8a326578f022100b2a9879e1acf621faa6466c207746a7f3eb4c8514c1482969aba3f2a957f1321012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c"),
+                script: ScriptBuf::from_hex("48304502203b89a71628a28cc3703d170ca3be77786cff6b867e38a18b719705f8a326578f022100b2a9879e1acf621faa6466c207746a7f3eb4c8514c1482969aba3f2a957f1321012103f1575d6124ac78be398c25b31146d08313c6072d23a4d7df5ac6a9f87346c64c").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             },
@@ -564,7 +579,7 @@ mod tests {
                     ).unwrap(),
                     vout: 242,
                 },
-                script: hex!("493046022100ef794a8ef7fd6752d2a183c18866ff6e8dc0f5bd889a63e2c21cf303a6302461022100c1b09662d9e92988c3f9fcf17d1bcc79b5403647095d7212b9f8a1278a532d68012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc"),
+                script: ScriptBuf::from_hex("493046022100ef794a8ef7fd6752d2a183c18866ff6e8dc0f5bd889a63e2c21cf303a6302461022100c1b09662d9e92988c3f9fcf17d1bcc79b5403647095d7212b9f8a1278a532d68012103091137f3ef23f4acfc19a5953a68b2074fae942ad3563ef28c33b0cac9a93adc").unwrap(),
                 sequence: 4294967295,
                 witness: Witness::default(),
             }];
@@ -577,11 +592,13 @@ mod tests {
         let output = [
             TxOut {
                 value: 137820000,
-                script: hex!("76a9148fd139bb39ced713f231c58a4d07bf6954d1c20188ac"),
+                script: ScriptBuf::from_hex("76a9148fd139bb39ced713f231c58a4d07bf6954d1c20188ac")
+                    .unwrap(),
             },
             TxOut {
                 value: 1000001,
-                script: hex!("76a9146c772e9cf96371bba3da8cb733da70a2fcf2007888ac"),
+                script: ScriptBuf::from_hex("76a9146c772e9cf96371bba3da8cb733da70a2fcf2007888ac")
+                    .unwrap(),
             },
         ];
 
@@ -638,7 +655,7 @@ mod tests {
                 &output[i],
                 "output[{}] mismatch: {}",
                 i,
-                v.script.to_lower_hex_string()
+                v.script.to_hex_string()
             );
         }
     }

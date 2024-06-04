@@ -8,6 +8,7 @@ pub mod block;
 pub mod chainparams;
 pub mod opcodes;
 pub mod script;
+pub mod sighash;
 pub mod transaction;
 
 pub extern crate hex;
