@@ -4,7 +4,7 @@
 
 use bitcoin::consensus::{encode, Decodable, Encodable};
 use bitcoin::hashes::{hash_newtype, sha256d, Hash};
-use bitcoin::ScriptBuf;
+use bitcoin::{ScriptBuf, VarInt};
 use bitcoin_io::{BufRead, Error, Write};
 use core::cmp;
 use std::ops::Deref;
@@ -57,6 +57,7 @@ pub struct OutPoint {
 }
 
 impl OutPoint {
+    pub const SIZE: usize = 36;
     pub fn is_null(&self) -> bool {
         self.vout == u32::MAX && self.txid == Txid::default()
     }
@@ -131,6 +132,25 @@ impl TxIn {
     pub const SEQUENCE_LOCKTIME_TYPE_FLAG: u32 = 1 << 22;
     pub const SEQUENCE_LOCKTIME_MASK: u32 = 0x0000ffff;
     pub const SEQUENCE_LOCKTIME_GRANULARITY: u32 = 9;
+
+    /// Returns the base size of this input.
+    ///
+    /// Base size excludes the witness data (see [`Self::total_size`]).
+    pub fn size(&self) -> usize {
+        let mut size = OutPoint::SIZE;
+
+        size += VarInt::from(self.script.len()).size();
+        size += self.script.len();
+
+        size + 4 // Sequence::SIZE
+    }
+
+    /// Returns the total number of bytes that this input contributes to a transaction.
+    ///
+    /// Total size includes the witness data (for base size see [`Self::base_size`]).
+    pub fn total_size(&self) -> usize {
+        self.size() + self.witness.stack.len()
+    }
 }
 
 impl Default for TxIn {
@@ -172,14 +192,22 @@ impl Decodable for TxIn {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TxOut {
     pub value: u64,
-    pub script: ScriptBuf,
+    pub script_pubkey: ScriptBuf,
+}
+
+impl TxOut {
+    /// Returns the total number of bytes that this output contributes to a transaction.
+    pub fn size(&self) -> usize {
+        let len = self.script_pubkey.len();
+        VarInt::from(len).size() + len + 8 // value size
+    }
 }
 
 impl Default for TxOut {
     fn default() -> TxOut {
         TxOut {
             value: u64::MAX,
-            script: ScriptBuf::new(),
+            script_pubkey: ScriptBuf::new(),
         }
     }
 }
@@ -188,7 +216,7 @@ impl Encodable for TxOut {
     fn consensus_encode<W: Write + ?Sized>(&self, w: &mut W) -> Result<usize, Error> {
         let mut len = 0;
         len += self.value.consensus_encode(w)?;
-        len += self.script.consensus_encode(w)?;
+        len += self.script_pubkey.consensus_encode(w)?;
         Ok(len)
     }
 }
@@ -200,7 +228,7 @@ impl Decodable for TxOut {
     ) -> Result<Self, encode::Error> {
         Ok(TxOut {
             value: Decodable::consensus_decode_from_finite_reader(r)?,
-            script: Decodable::consensus_decode_from_finite_reader(r)?,
+            script_pubkey: Decodable::consensus_decode_from_finite_reader(r)?,
         })
     }
 }
@@ -251,20 +279,6 @@ impl Transaction {
     pub const MAX_STANDARD_VERSION: u32 = 2;
     pub const SERIALIZE_TRANSACTION_NO_WITNESS: u32 = 0x40000000;
 
-    /// Computes a "normalized TXID" which does not include any signatures.
-    ///
-    /// This gives a way to identify a transaction that is "the same" as
-    /// another in the sense of having same inputs and outputs.
-    pub fn compute_ntxid(&self) -> sha256d::Hash {
-        let cloned_tx = Transaction {
-            version: self.version,
-            lock_time: self.lock_time,
-            input: self.input.clone(),
-            output: self.output.clone(),
-        };
-        *cloned_tx.compute_txid()
-    }
-
     /// Computes the [`Txid`].
     pub fn compute_txid(&self) -> Txid {
         let mut enc = Txid::engine();
@@ -281,6 +295,25 @@ impl Transaction {
 
     pub fn is_coinbase(&self) -> bool {
         self.input.len() == 1 && self.input[0].prevout.is_null()
+    }
+
+    /// Returns the base transaction size.
+    ///
+    /// > Base transaction size is the size of the transaction serialised with the witness data stripped.
+    pub fn size(&self) -> usize {
+        let mut size: usize = 4; // Serialized length of a u32 for the version number.
+
+        size += VarInt::from(self.input.len()).size();
+        size += self.input.iter().map(|input| input.size()).sum::<usize>();
+
+        size += VarInt::from(self.output.len()).size();
+        size += self
+            .output
+            .iter()
+            .map(|output| output.size())
+            .sum::<usize>();
+
+        size + 4 // LockTime::SIZE
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -592,13 +625,17 @@ mod tests {
         let output = [
             TxOut {
                 value: 137820000,
-                script: ScriptBuf::from_hex("76a9148fd139bb39ced713f231c58a4d07bf6954d1c20188ac")
-                    .unwrap(),
+                script_pubkey: ScriptBuf::from_hex(
+                    "76a9148fd139bb39ced713f231c58a4d07bf6954d1c20188ac",
+                )
+                .unwrap(),
             },
             TxOut {
                 value: 1000001,
-                script: ScriptBuf::from_hex("76a9146c772e9cf96371bba3da8cb733da70a2fcf2007888ac")
-                    .unwrap(),
+                script_pubkey: ScriptBuf::from_hex(
+                    "76a9146c772e9cf96371bba3da8cb733da70a2fcf2007888ac",
+                )
+                .unwrap(),
             },
         ];
 
@@ -655,7 +692,7 @@ mod tests {
                 &output[i],
                 "output[{}] mismatch: {}",
                 i,
-                v.script.to_hex_string()
+                v.script_pubkey.to_hex_string()
             );
         }
     }

@@ -76,6 +76,8 @@ async fn main() {
     let agent = RPCAgent::new();
     assert!(DogecoinRPC::ping(&agent, "").await.is_ok());
 
+    let chain = &DOGE_TEST_NET_CHAIN;
+
     let txid1 =
         Txid::from_str("adbf6cc9fb3ce82717565a2e10c935a9dd02503c36dab36fd9b3e768f9ae5fab").unwrap();
     let tx1 = DogecoinRPC::get_transaction(&agent, "", &txid1)
@@ -91,7 +93,7 @@ async fn main() {
 
     let spend_addr = hash160_to_address(
         &hex!("3224fd0571314c5959a075b9946d9f7218c01667"),
-        DOGE_TEST_NET_CHAIN.p2pkh_address_prefix,
+        chain.p2pkh_address_prefix,
     );
     assert_eq!(spend_addr.to_string(), "nYmJMro1rtZvHWm5a4WxTE77bGYtRYrfao");
     let mut send_tx = Transaction {
@@ -112,15 +114,16 @@ async fn main() {
     };
     let fee = 1_000_000;
     send_tx.output[0].value = tx1.output[0].value + tx2.output[0].value - fee;
-    send_tx.output[0].script = spend_addr.to_script(); // send to self
+    send_tx.output[0].script_pubkey = spend_addr.to_script(chain); // send to self
 
     let secp = Secp256k1::new();
     let sk = decode_secretkey_wif(&std::env::var("SECRET_KEY").unwrap()).unwrap();
     let pk = sk.public_key(&secp);
+
     let mut sighasher = SighashCache::new(&mut send_tx);
 
     let sighash = sighasher
-        .signature_hash(0, &tx1.output[0].script, EcdsaSighashType::All)
+        .signature_hash(0, &tx1.output[0].script_pubkey, EcdsaSighashType::All)
         .unwrap();
     let sig = secp.sign_ecdsa(&sighash.into(), &sk);
     sighasher
@@ -135,7 +138,7 @@ async fn main() {
         .unwrap();
 
     let sighash = sighasher
-        .signature_hash(1, &tx2.output[0].script, EcdsaSighashType::All)
+        .signature_hash(1, &tx2.output[0].script_pubkey, EcdsaSighashType::All)
         .unwrap();
     let sig = secp.sign_ecdsa(&sighash.into(), &sk);
     sighasher
@@ -151,10 +154,13 @@ async fn main() {
 
     println!("signed tx: {:?}", sighasher.transaction());
     println!("signed txid: {:?}", sighasher.transaction().compute_txid());
+    println!("tx size: {:?}", sighasher.transaction().size());
+    assert_eq!(sighasher.transaction().size(), 339);
 
     let txid = DogecoinRPC::send_transaction(&agent, "", sighasher.transaction())
         .await
         .unwrap();
 
     println!("tx send: {:?}", txid);
+    // https://sochain.com/tx/DOGETEST/d6af50cbadd243a5e33ddb494e30bca765d47d3eac5fd5309584bff6ea208343
 }

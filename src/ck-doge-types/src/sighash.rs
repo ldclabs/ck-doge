@@ -145,7 +145,7 @@ impl<R: Borrow<Transaction>> SighashCache<R> {
         Ok(true)
     }
 
-    /// Computes a legacy signature hash for a given input index with a given sighash flag.
+    /// Computes a signature hash for a given input index with a given sighash flag.
     pub fn signature_hash(
         &self,
         input_index: usize,
@@ -201,30 +201,6 @@ pub fn decode_secretkey_wif(sk: &str) -> Result<SecretKey, String> {
         Err(_) => Err("invalid base58 secret key".to_string()),
     }
 }
-
-// func DecodeECPrivKeyWIF(str string, chain *ChainParams) (ec_priv_key ECPrivKey, out_chain *ChainParams, err error) {
-// 	data, err := Base58DecodeCheck(str)
-// 	if err != nil {
-// 		return nil, nil, err
-// 	}
-// 	if chain == nil {
-// 		chain = ChainFromWIFPrefix(data, true)
-// 	}
-// 	if data[0] != chain.pkey_prefix {
-// 		err = fmt.Errorf("DecodeECPrivKeyWIF: wrong key prefix")
-// 		return nil, nil, err
-// 	}
-// 	var pk [ECPrivKeyLen]byte
-// 	if copy(pk[:], data[1:33]) != ECPrivKeyLen {
-// 		panic("DecodeECPrivKeyWIF: wrong copy length")
-// 	}
-// 	if !ECKeyIsValid(pk[:]) {
-// 		err = fmt.Errorf("DecodeECPrivKeyWIF: invalid EC key (zero or >= N)")
-// 		return nil, nil, err
-// 	}
-// 	clear(data[:]) // clear key for security.
-// 	return pk[:], chain, nil
-// }
 
 fn split_anyonecanpay_flag(st: EcdsaSighashType) -> (EcdsaSighashType, bool) {
     use EcdsaSighashType::*;

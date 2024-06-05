@@ -58,8 +58,14 @@ impl Address {
         self.0[0] == chain.p2pkh_address_prefix || self.0[0] == chain.p2sh_address_prefix
     }
 
-    pub fn to_script(&self) -> ScriptBuf {
-        ScriptBuf::new_p2pkh(&PubkeyHash::from_slice(&self.0[1..]).unwrap())
+    pub fn to_script(&self, chain: &ChainParams) -> ScriptBuf {
+        if self.is_p2pkh(chain) {
+            ScriptBuf::new_p2pkh(&PubkeyHash::from_slice(&self.0[1..]).unwrap())
+        } else if self.is_p2sh(chain) {
+            ScriptBuf::new_p2sh(&ScriptHash::from_slice(&self.0[1..]).unwrap())
+        } else {
+            ScriptBuf::default()
+        }
     }
 }
 
