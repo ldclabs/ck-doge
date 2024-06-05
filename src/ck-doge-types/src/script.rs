@@ -5,6 +5,7 @@ use std::str::FromStr;
 use crate::chainparams::ChainParams;
 use crate::opcodes::*;
 
+pub use bitcoin::key::PubkeyHash;
 pub use bitcoin::script::{Bytes, PushBytes, Script, ScriptBuf, ScriptHash};
 
 // Dogecoin Script Types enum.
@@ -55,6 +56,10 @@ impl Address {
 
     pub fn is_valid(&self, chain: &ChainParams) -> bool {
         self.0[0] == chain.p2pkh_address_prefix || self.0[0] == chain.p2sh_address_prefix
+    }
+
+    pub fn to_script(&self) -> ScriptBuf {
+        ScriptBuf::new_p2pkh(&PubkeyHash::from_slice(&self.0[1..]).unwrap())
     }
 }
 

@@ -1,5 +1,10 @@
 [workspace]
-members = ["src/ck-doge-canister", "src/ck-doge-types"]
+members = [
+  "src/ck-doge-canister",
+  "src/ck-doge-types",
+  "examples/check-blocks",
+  "examples/send-tx",
+]
 resolver = "2"
 
 [workspace.package]
@@ -11,6 +16,7 @@ categories = ["blockchain", "web3"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+bytes = "1.6"
 serde = "1"
 serde_json = "1"
 serde_bytes = "0.11"
@@ -22,3 +28,4 @@ bitcoin = "0.32"
 hex = { package = "hex-conservative", version = "0.2", default-features = false, features = [
   "alloc",
 ] }
+async-trait = "0.1"

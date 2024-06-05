@@ -1,3 +1,4 @@
+use bitcoin::base58;
 use bitcoin::consensus::Encodable;
 use bitcoin::hashes::{hash_newtype, sha256d, Hash};
 use bitcoin_io::Write;
@@ -7,13 +8,20 @@ pub use bitcoin::ecdsa::Signature as SighashSignature;
 pub use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 pub use bitcoin::EcdsaSighashType;
 
+use crate::chainparams::chain_from_wif;
 use crate::script::ScriptBuf;
-use crate::transaction::*;
+use crate::{err_string, transaction::*};
 
 hash_newtype! {
     /// Hash of a transaction according to the legacy signature algorithm.
     #[hash_newtype(forward)]
     pub struct Sighash(sha256d::Hash);
+}
+
+impl From<Sighash> for Message {
+    fn from(hash: Sighash) -> Self {
+        Message::from_digest(hash.to_byte_array())
+    }
 }
 
 /// Used for signature hash for invalid use of SIGHASH_SINGLE.
@@ -177,6 +185,46 @@ impl<R: BorrowMut<Transaction>> SighashCache<R> {
             .ok_or("input index out of range".to_string())
     }
 }
+
+// https://en.bitcoin.it/wiki/Wallet_import_format
+pub fn decode_secretkey_wif(sk: &str) -> Result<SecretKey, String> {
+    match base58::decode_check(sk) {
+        Ok(data) => {
+            let chain = chain_from_wif(sk);
+            if data[0] != chain.pkey_prefix {
+                return Err("wrong key prefix".to_string());
+            }
+            println!("data: {:?}", data.len());
+            let key = SecretKey::from_slice(&data[1..33]).map_err(err_string)?;
+            Ok(key)
+        }
+        Err(_) => Err("invalid base58 secret key".to_string()),
+    }
+}
+
+// func DecodeECPrivKeyWIF(str string, chain *ChainParams) (ec_priv_key ECPrivKey, out_chain *ChainParams, err error) {
+// 	data, err := Base58DecodeCheck(str)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+// 	if chain == nil {
+// 		chain = ChainFromWIFPrefix(data, true)
+// 	}
+// 	if data[0] != chain.pkey_prefix {
+// 		err = fmt.Errorf("DecodeECPrivKeyWIF: wrong key prefix")
+// 		return nil, nil, err
+// 	}
+// 	var pk [ECPrivKeyLen]byte
+// 	if copy(pk[:], data[1:33]) != ECPrivKeyLen {
+// 		panic("DecodeECPrivKeyWIF: wrong copy length")
+// 	}
+// 	if !ECKeyIsValid(pk[:]) {
+// 		err = fmt.Errorf("DecodeECPrivKeyWIF: invalid EC key (zero or >= N)")
+// 		return nil, nil, err
+// 	}
+// 	clear(data[:]) // clear key for security.
+// 	return pk[:], chain, nil
+// }
 
 fn split_anyonecanpay_flag(st: EcdsaSighashType) -> (EcdsaSighashType, bool) {
     use EcdsaSighashType::*;

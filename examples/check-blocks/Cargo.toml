@@ -1,33 +1,17 @@
 [package]
-name = "ck-doge-types"
-description = "Types for dogecoin chain data"
-publish = true
-
+name = "check-blocks"
+publish = false
 version.workspace = true
 edition.workspace = true
 keywords.workspace = true
 categories.workspace = true
 license.workspace = true
 
-[lib]
-
-[features]
-default = []
-serde = []
-
 [dependencies]
 bytes = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-serde_bytes = { workspace = true }
-ciborium = { workspace = true }
-bitcoin = { workspace = true }
-hex = { workspace = true }
-async-trait = { workspace = true }
-bitcoin-io = "0.1"
-
-[dev-dependencies]
 base64 = { workspace = true }
+async-trait = { workspace = true }
+ck-doge-types = { path = "../../src/ck-doge-types", version = "0.1" }
 reqwest = { version = "0.12", features = [
   "rustls-tls",
   "rustls-tls-webpki-roots",

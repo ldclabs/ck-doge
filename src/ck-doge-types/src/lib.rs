@@ -6,6 +6,7 @@ use bitcoin_io::{BufRead, Error, Write};
 
 pub mod block;
 pub mod chainparams;
+pub mod jsonrpc;
 pub mod opcodes;
 pub mod script;
 pub mod sighash;
@@ -38,4 +39,8 @@ where
         vv.push(Decodable::consensus_decode_from_finite_reader(r)?);
     }
     Ok(vv)
+}
+
+pub fn err_string(err: impl std::fmt::Display) -> String {
+    err.to_string()
 }

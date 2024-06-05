@@ -305,6 +305,27 @@ mod tests {
     use super::*;
     use hex::test_hex_unwrap as hex;
     use hex::DisplayHex;
+    use std::str::FromStr;
+
+    #[test]
+    fn test_blockhash() {
+        let hash = "4339bc72f0820b2a28c5dabda3de47605cdcaad845516de82d685d51233e6c4d";
+        let blockhash = BlockHash::from_str(hash).unwrap();
+        let mut data: [u8; 32] = *blockhash.as_ref();
+        assert_eq!(blockhash.to_string(), hash);
+        data.reverse();
+        assert_eq!(data.to_lower_hex_string(), hash);
+    }
+
+    #[test]
+    fn test_first_block() {
+        // block height 0
+        let data = hex!("010000000000000000000000000000000000000000000000000000000000000000000000696ad20e2dd4365c7459b4a4a5af743d5e92c6da3229e6532cd605f6533f2a5b24a6a152f0ff0f1e678601000101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1004ffff001d0104084e696e746f6e646fffffffff010058850c020000004341040184710fa689ad5023690c80f3a49c8f13f8d45b8c857fbcbc8bc4a8e4d3eb4b10f4d4604fa08dce601aaf0f470216fe1b51850b4acf21b179c45070ac7b03a9ac00000000");
+        let mut rd = &data[..];
+        let blk = Block::consensus_decode_from_finite_reader(&mut rd).unwrap();
+        println!("Block: {:?}", blk);
+        assert_eq!(blk.header.prev_blockhash, BlockHash::default());
+    }
 
     #[test]
     fn test_block() {
