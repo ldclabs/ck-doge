@@ -42,9 +42,9 @@ async fn admin_set_agent(arg: canister::RPCAgent) -> Result<(), String> {
         s.rpc_agent = rpc_agent;
     });
 
-    if store::state::runtime(|s| s.update_proxy_token_interval.is_none()) {
+    if store::state::runtime(|s| s.update_proxy_token_timer.is_none()) {
         store::state::runtime_mut(|s| {
-            s.update_proxy_token_interval = Some(ic_cdk_timers::set_timer_interval(
+            s.update_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(
                 Duration::from_secs(UPDATE_PROXY_TOKEN_INTERVAL),
                 || ic_cdk::spawn(update_proxy_token_interval()),
             ));
@@ -87,6 +87,7 @@ async fn admin_restart_sync_job() -> Result<(), String> {
 pub async fn update_proxy_token_interval() {
     let (ecdsa_key_name, mut rpc_agent) =
         store::state::with(|s| (s.ecdsa_key_name.clone(), s.rpc_agent.clone()));
+    // let start = ic_cdk::api::performance_counter(1);
     let token = ecdsa::sign_proxy_token(
         &ecdsa_key_name,
         (ic_cdk::api::time() / SECONDS) + UPDATE_PROXY_TOKEN_INTERVAL * 2,
@@ -95,6 +96,11 @@ pub async fn update_proxy_token_interval() {
     .await
     .expect("failed to sign proxy token");
 
+    // ic_cdk::println!(
+    //     "update_proxy_token_interval: {}, {}",
+    //     ic_cdk::api::performance_counter(1) - start,
+    //     token
+    // );
     rpc_agent.proxy_token = Some(token);
     store::state::with_mut(|r| {
         r.rpc_agent = rpc_agent;
@@ -107,6 +113,7 @@ enum FetchBlockError {
 }
 
 pub async fn sync_job_fetch_block() {
+    // let start = ic_cdk::api::performance_counter(1);
     store::state::runtime_mut(|s| s.sync_job_running = 1);
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();
@@ -128,14 +135,19 @@ pub async fn sync_job_fetch_block() {
     }
     .await;
 
+    // ic_cdk::println!(
+    //     "sync_job_fetch_block: {}",
+    //     ic_cdk::api::performance_counter(1) - start,
+    // );
+
     match res {
         Err(FetchBlockError::Other(err)) => {
             store::state::runtime_mut(|s| s.sync_job_running = -1);
-            store::state::with_mut(|s| s.last_errors.push(err.clone()));
+            store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }
         Err(FetchBlockError::ShouldWait(err)) => {
-            store::state::with_mut(|s| s.last_errors.push(err.clone()));
+            store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk_timers::set_timer(Duration::from_secs(FETCH_BLOCK_INTERVAL), || {
                 ic_cdk::spawn(sync_job_fetch_block())
             });
@@ -148,14 +160,19 @@ pub async fn sync_job_fetch_block() {
 }
 
 fn sync_job_process_block() {
+    // let start = ic_cdk::api::performance_counter(1);
     store::state::runtime_mut(|s| s.sync_job_running = 2);
     match store::process_block() {
         Err(err) => {
             store::state::runtime_mut(|s| s.sync_job_running = -2);
-            store::state::with_mut(|s| s.last_errors.push(err.clone()));
+            store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }
         Ok(res) => {
+            // ic_cdk::println!(
+            //     "sync_job_process_block: {}",
+            //     ic_cdk::api::performance_counter(1) - start,
+            // );
             if res {
                 ic_cdk_timers::set_timer(Duration::from_secs(0), sync_job_confirm_utxos);
             } else {
@@ -168,14 +185,19 @@ fn sync_job_process_block() {
 }
 
 fn sync_job_confirm_utxos() {
+    // let start = ic_cdk::api::performance_counter(1);
     store::state::runtime_mut(|s| s.sync_job_running = 3);
     match store::confirm_utxos() {
         Err(err) => {
             store::state::runtime_mut(|s| s.sync_job_running = -3);
-            store::state::with_mut(|s| s.last_errors.push(err.clone()));
+            store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }
         Ok(res) => {
+            // ic_cdk::println!(
+            //     "sync_job_confirm_utxos: {}",
+            //     ic_cdk::api::performance_counter(1) - start,
+            // );
             if res {
                 ic_cdk_timers::set_timer(Duration::from_secs(0), sync_job_process_block);
             } else {

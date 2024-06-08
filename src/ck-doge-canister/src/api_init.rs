@@ -18,7 +18,8 @@ pub struct InitArg {
 }
 
 #[ic_cdk::init]
-fn init(arg: InitArg) {
+fn init(arg: Option<InitArg>) {
+    let arg = arg.expect("init arg is missing");
     store::state::with_mut(|s| {
         s.chain = arg.chain;
         s.min_confirmations = arg.min_confirmations;
@@ -49,7 +50,7 @@ fn post_upgrade() {
             ic_cdk::spawn(sync_job_fetch_block())
         });
 
-        s.update_proxy_token_interval = Some(ic_cdk_timers::set_timer_interval(
+        s.update_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(
             Duration::from_secs(UPDATE_PROXY_TOKEN_INTERVAL),
             || ic_cdk::spawn(update_proxy_token_interval()),
         ));

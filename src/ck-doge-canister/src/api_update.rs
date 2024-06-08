@@ -35,7 +35,7 @@ async fn create_signed_transaction(
     let pubkey = PublicKey::from_slice(&mykey.public_key).map_err(err_string)?;
     let script_pubkey = myaddr.to_script(chain);
 
-    let uxtos = store::list_uxtos(&myaddr.0, 1000, true);
+    let uxtos = store::list_uxtos(&myaddr.0, 1000, false);
     let total_value: u64 = uxtos.iter().map(|u| u.value).sum();
 
     let mut send_tx = Transaction {

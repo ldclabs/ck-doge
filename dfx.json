@@ -1,8 +1,21 @@
 {
   "canisters": {
+    "ck-doge-canister": {
+      "candid": "src/ck-doge-canister/ck-doge-canister.did",
+      "declarations": {
+        "node_compatibility": true
+      },
+      "package": "ck-doge-canister",
+      "optimize": "cycles",
+      "type": "rust"
+    },
     "ck-doge-minter": {
       "candid": "src/ck-doge-minter/ck-doge-minter.did",
+      "declarations": {
+        "node_compatibility": true
+      },
       "package": "ck-doge-minter",
+      "optimize": "cycles",
       "type": "rust"
     }
   },

@@ -25,23 +25,30 @@ type Result_2 = variant { Ok : text; Err : text };
 type Result_3 = variant { Ok : BlockRef; Err : text };
 type Result_4 = variant { Ok : UnspentTx; Err : text };
 type Result_5 = variant { Ok : vec Utxo; Err : text };
-type Result_6 = variant { Ok : State; Err };
-type Result_7 = variant { Ok : SendSignedTransactionOutput; Err : text };
+type Result_6 = variant { Ok : nat64; Err : text };
+type Result_7 = variant { Ok : State; Err };
+type Result_8 = variant { Ok : SendSignedTransactionOutput; Err : text };
 type SendSignedTransactionInput = record { tx : blob };
 type SendSignedTransactionOutput = record { txid : blob; instructions : nat64 };
 type State = record {
-  pull_block_retries : nat32;
   start_height : nat64;
   processed_height : nat64;
   tip_height : nat64;
+  rpc_agent : opt RPCAgent;
+  ecdsa_key_name : opt text;
   managers : vec principal;
-  rpc_proxy_public_key : text;
+  rpc_proxy_public_key : opt text;
   chain : text;
   confirmed_height : nat64;
+  unconfirmed_utxos : opt nat64;
+  unprocessed_blocks : opt nat64;
   last_errors : vec text;
+  confirmed_utxs : opt nat64;
   tip_blockhash : text;
+  unconfirmed_utxs : opt nat64;
   min_confirmations : nat32;
   processed_blockhash : text;
+  confirmed_utxos : opt nat64;
   start_blockhash : text;
 };
 type UnspentTx = record {
@@ -50,7 +57,7 @@ type UnspentTx = record {
   spent : vec opt blob;
 };
 type Utxo = record { height : nat64; value : nat64; txid : blob; vout : nat32 };
-service : (InitArg) -> {
+service : (opt InitArg) -> {
   admin_restart_sync_job : () -> (Result);
   admin_set_agent : (RPCAgent) -> (Result);
   admin_set_managers : (vec principal) -> (Result);
@@ -61,9 +68,10 @@ service : (InitArg) -> {
   get_tx : (text) -> (Result_4) composite_query;
   list_uxtos : (text, nat16, bool) -> (Result_5) composite_query;
   query_address : () -> (Result_2) query;
-  query_state : () -> (Result_6) query;
+  query_balance : (text) -> (Result_6) query;
+  query_state : () -> (Result_7) query;
   query_tx : (text) -> (Result_4) query;
   query_uxtos : (text, nat16, bool) -> (Result_5) query;
-  send_signed_transaction : (SendSignedTransactionInput) -> (Result_7);
+  send_signed_transaction : (SendSignedTransactionInput) -> (Result_8);
   validate_admin_set_managers : (vec principal) -> (Result);
 }

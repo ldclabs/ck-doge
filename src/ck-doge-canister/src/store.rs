@@ -59,19 +59,25 @@ pub struct State {
     pub start_height: u64,
     pub start_blockhash: [u8; 32],
 
-    pub pull_block_retries: u32,
-    pub last_errors: Vec<String>,
+    pub last_errors: VecDeque<String>,
 
     pub managers: BTreeSet<Principal>,
     pub rpc_agent: RPCAgent,
 
-    unconfirmed_utxs: BTreeMap<[u8; 32], UnspentTxState>,
-    unconfirmed_utxos: BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    pub unconfirmed_utxs: BTreeMap<[u8; 32], UnspentTxState>,
+    pub unconfirmed_utxos: BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
 }
 
 impl State {
     pub fn chain_params(&self) -> &'static ChainParams {
         chain_from_key_bits(self.chain)
+    }
+
+    pub fn append_error(&mut self, err: String) {
+        self.last_errors.push_back(err);
+        if self.last_errors.len() > 7 {
+            self.last_errors.pop_front();
+        }
     }
 }
 
@@ -163,7 +169,7 @@ const XO_MEMORY_ID: MemoryId = MemoryId::new(2);
 #[derive(Default)]
 pub struct RuntimeState {
     pub sync_job_running: i8, // 0: not running, > 0: running, < 0: stop because of error
-    pub update_proxy_token_interval: Option<ic_cdk_timers::TimerId>,
+    pub update_proxy_token_timer: Option<ic_cdk_timers::TimerId>,
 }
 
 thread_local! {
@@ -209,6 +215,18 @@ pub mod state {
 
     pub fn get_agent() -> RPCAgent {
         STATE_HEAP.with(|r| r.borrow().rpc_agent.clone())
+    }
+
+    pub fn get_unprocessed_blocks_len() -> u64 {
+        UNPROCESSED_BLOCKS.with(|r| r.borrow().len() as u64)
+    }
+
+    pub fn get_confirmed_utxs_len() -> u64 {
+        UT.with(|r| r.borrow().len())
+    }
+
+    pub fn get_confirmed_utxos_len() -> u64 {
+        XO.with(|r| r.borrow().len())
     }
 
     pub fn with<R>(f: impl FnOnce(&State) -> R) -> R {
@@ -444,6 +462,19 @@ pub fn get_tx(txid: &[u8; 32]) -> Option<UnspentTx> {
         Some(utx) => Some(UnspentTx::from(utx.clone())),
         None => UT.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
     })
+}
+
+pub fn get_balance(addr: &[u8; 21]) -> u64 {
+    let mut res = XO.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
+    state::with(|s| {
+        if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
+            for ts in sts.0.iter() {
+                res.remove(&UtxoState(ts.0, 0, ts.2, ts.3, ts.4));
+            }
+            res.append(&mut uts.0.clone());
+        }
+    });
+    res.into_iter().map(|v| v.4).sum()
 }
 
 pub fn list_uxtos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
