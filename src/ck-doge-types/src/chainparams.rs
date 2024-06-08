@@ -1,4 +1,6 @@
-#[derive(Clone, PartialEq, Eq, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct ChainParams {
     pub chain_name: &'static str,
     pub genesis_block: &'static str,

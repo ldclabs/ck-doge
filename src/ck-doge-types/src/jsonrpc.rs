@@ -24,7 +24,7 @@ pub trait JsonRPCAgent {
 pub struct DogecoinRPC {}
 
 #[derive(Debug, Serialize)]
-struct RPCRequest<'a> {
+pub struct RPCRequest<'a> {
     jsonrpc: &'a str,
     method: &'a str,
     params: &'a [Value],
@@ -32,7 +32,7 @@ struct RPCRequest<'a> {
 }
 
 #[derive(Debug, Deserialize)]
-struct RPCResponse<T> {
+pub struct RPCResponse<T> {
     result: Option<T>,
     error: Option<Value>,
     // id: u64,
@@ -65,8 +65,8 @@ impl DogecoinRPC {
 
     pub async fn get_blockhash(
         agent: impl JsonRPCAgent,
-        height: u64,
         idempotency_key: &str,
+        height: u64,
     ) -> Result<BlockHash, String> {
         let hex: String =
             Self::call(agent, idempotency_key, "getblockhash", &[height.into()]).await?;
@@ -127,6 +127,21 @@ impl DogecoinRPC {
             idempotency_key,
             "sendrawtransaction",
             &[serialize_hex(tx).into()],
+        )
+        .await?;
+        Txid::from_str(&hex).map_err(err_string)
+    }
+
+    pub async fn send_rawtransaction(
+        agent: impl JsonRPCAgent,
+        idempotency_key: &str,
+        raw: &[u8],
+    ) -> Result<Txid, String> {
+        let hex: String = Self::call(
+            agent,
+            idempotency_key,
+            "sendrawtransaction",
+            &[raw.to_lower_hex_string().into()],
         )
         .await?;
         Txid::from_str(&hex).map_err(err_string)

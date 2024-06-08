@@ -44,7 +44,7 @@ pub const ECPUB_KEY_COMPRESSED_LEN: usize = 33; // bytes: [x02/x03][32-X] 2=even
 pub const ECPUB_KEY_UNCOMPRESSED_LEN: usize = 65; // bytes: [x04][32-X][32-Y]
 
 #[derive(Clone, PartialEq, Eq, Debug, Hash, Default)]
-pub struct Address([u8; 21]); // Dogecoin address (base-58 Public Key Hash aka PKH)
+pub struct Address(pub [u8; 21]); // Dogecoin address (base-58 Public Key Hash aka PKH)
 impl Address {
     pub fn is_p2pkh(&self, chain: &ChainParams) -> bool {
         self.0[0] == chain.p2pkh_address_prefix

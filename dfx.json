@@ -1,8 +1,8 @@
 {
   "canisters": {
-    "ck-doge-backend": {
-      "candid": "src/ck-doge-canister/ck-doge-canister.did",
-      "package": "ck-doge-canister",
+    "ck-doge-minter": {
+      "candid": "src/ck-doge-minter/ck-doge-minter.did",
+      "package": "ck-doge-minter",
       "type": "rust"
     }
   },

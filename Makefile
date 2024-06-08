@@ -15,7 +15,9 @@ test:
 # cargo install ic-wasm
 build-wasm:
 	cargo build --release --target wasm32-unknown-unknown --package ck-doge-canister
+	cargo build --release --target wasm32-unknown-unknown --package ck-doge-minter
 
 # cargo install candid-extractor
 build-did:
 	candid-extractor target/wasm32-unknown-unknown/release/ck_doge_canister.wasm > src/ck-doge-canister/ck-doge-canister.did
+	candid-extractor target/wasm32-unknown-unknown/release/ck_doge_minter.wasm > src/ck-doge-minter/ck-doge-minter.did

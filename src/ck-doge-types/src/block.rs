@@ -21,10 +21,10 @@ impl Default for BlockHash {
 }
 
 impl Deref for BlockHash {
-    type Target = sha256d::Hash;
+    type Target = [u8; 32];
 
-    fn deref(&self) -> &sha256d::Hash {
-        &self.0
+    fn deref(&self) -> &[u8; 32] {
+        self.0.as_byte_array()
     }
 }
 
@@ -53,10 +53,10 @@ impl Default for TxMerkleNode {
 }
 
 impl Deref for TxMerkleNode {
-    type Target = sha256d::Hash;
+    type Target = [u8; 32];
 
-    fn deref(&self) -> &sha256d::Hash {
-        &self.0
+    fn deref(&self) -> &[u8; 32] {
+        self.0.as_byte_array()
     }
 }
 
@@ -340,6 +340,9 @@ mod tests {
         let mut buf = Vec::new();
         blk.consensus_encode(&mut buf).unwrap();
         assert_eq!(buf, data);
+
+        // println!("Tx 0: {:?}", blk.txdata[0]);
+        // println!("Tx m: {:?}", blk.clone().auxpow.unwrap());
 
         assert_eq!(
             blk.block_hash().to_string(),

@@ -4,7 +4,9 @@ use bitcoin::{
 };
 use bitcoin_io::{BufRead, Error, Write};
 
+pub mod amount;
 pub mod block;
+pub mod canister;
 pub mod chainparams;
 pub mod jsonrpc;
 pub mod opcodes;

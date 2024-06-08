@@ -3,9 +3,10 @@ use bitcoin::consensus::Encodable;
 use bitcoin::hashes::{hash_newtype, sha256d, Hash};
 use bitcoin_io::Write;
 use std::borrow::{Borrow, BorrowMut};
+use std::ops::Deref;
 
 pub use bitcoin::ecdsa::Signature as SighashSignature;
-pub use bitcoin::secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
+pub use bitcoin::secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1, SecretKey};
 pub use bitcoin::EcdsaSighashType;
 
 use crate::chainparams::chain_from_wif;
@@ -16,6 +17,14 @@ hash_newtype! {
     /// Hash of a transaction according to the legacy signature algorithm.
     #[hash_newtype(forward)]
     pub struct Sighash(sha256d::Hash);
+}
+
+impl Deref for Sighash {
+    type Target = [u8; 32];
+
+    fn deref(&self) -> &[u8; 32] {
+        self.0.as_byte_array()
+    }
 }
 
 impl From<Sighash> for Message {

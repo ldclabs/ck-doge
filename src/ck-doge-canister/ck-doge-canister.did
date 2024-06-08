@@ -1,1 +1,69 @@
-service : { api_version : () -> (nat16) query }
+type BlockRef = record { height : nat64; hash : text };
+type CreateSignedTransactionInput = record {
+  fee : nat64;
+  address : text;
+  amount : nat64;
+};
+type CreateSignedTransactionOutput = record { tx : blob; instructions : nat64 };
+type InitArg = record {
+  ecdsa_key_name : text;
+  chain : nat8;
+  prev_start_height : nat64;
+  prev_start_blockhash : text;
+  min_confirmations : nat32;
+};
+type RPCAgent = record {
+  proxy_token : opt text;
+  api_token : opt text;
+  endpoint : text;
+  name : text;
+  max_cycles : nat64;
+};
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : CreateSignedTransactionOutput; Err : text };
+type Result_2 = variant { Ok : text; Err : text };
+type Result_3 = variant { Ok : BlockRef; Err : text };
+type Result_4 = variant { Ok : UnspentTx; Err : text };
+type Result_5 = variant { Ok : vec Utxo; Err : text };
+type Result_6 = variant { Ok : State; Err };
+type Result_7 = variant { Ok : SendSignedTransactionOutput; Err : text };
+type SendSignedTransactionInput = record { tx : blob };
+type SendSignedTransactionOutput = record { txid : blob; instructions : nat64 };
+type State = record {
+  pull_block_retries : nat32;
+  start_height : nat64;
+  processed_height : nat64;
+  tip_height : nat64;
+  managers : vec principal;
+  rpc_proxy_public_key : text;
+  chain : text;
+  confirmed_height : nat64;
+  last_errors : vec text;
+  tip_blockhash : text;
+  min_confirmations : nat32;
+  processed_blockhash : text;
+  start_blockhash : text;
+};
+type UnspentTx = record {
+  height : nat64;
+  output : vec blob;
+  spent : vec opt blob;
+};
+type Utxo = record { height : nat64; value : nat64; txid : blob; vout : nat32 };
+service : (InitArg) -> {
+  admin_restart_sync_job : () -> (Result);
+  admin_set_agent : (RPCAgent) -> (Result);
+  admin_set_managers : (vec principal) -> (Result);
+  api_version : () -> (nat16) query;
+  create_signed_transaction : (CreateSignedTransactionInput) -> (Result_1);
+  get_address : () -> (Result_2) composite_query;
+  get_tip : () -> (Result_3) composite_query;
+  get_tx : (text) -> (Result_4) composite_query;
+  list_uxtos : (text, nat16, bool) -> (Result_5) composite_query;
+  query_address : () -> (Result_2) query;
+  query_state : () -> (Result_6) query;
+  query_tx : (text) -> (Result_4) query;
+  query_uxtos : (text, nat16, bool) -> (Result_5) query;
+  send_signed_transaction : (SendSignedTransactionInput) -> (Result_7);
+  validate_admin_set_managers : (vec principal) -> (Result);
+}

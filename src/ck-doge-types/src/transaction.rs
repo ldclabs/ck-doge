@@ -9,7 +9,7 @@ use bitcoin_io::{BufRead, Error, Write};
 use core::cmp;
 use std::ops::Deref;
 
-use crate::{consensus_decode_from_vec, consensus_encode_vec};
+use crate::{consensus_decode_from_vec, consensus_encode_vec, err_string};
 
 hash_newtype! {
     pub struct Txid(sha256d::Hash);
@@ -22,10 +22,10 @@ impl Default for Txid {
 }
 
 impl Deref for Txid {
-    type Target = sha256d::Hash;
+    type Target = [u8; 32];
 
-    fn deref(&self) -> &sha256d::Hash {
-        &self.0
+    fn deref(&self) -> &[u8; 32] {
+        self.0.as_byte_array()
     }
 }
 
@@ -48,7 +48,6 @@ impl Decodable for Txid {
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct OutPoint {
     /// The referenced transaction's txid.
     pub txid: Txid,
@@ -94,7 +93,6 @@ impl Decodable for OutPoint {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash, Default)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Witness {
     pub stack: Vec<u8>,
 }
@@ -119,7 +117,6 @@ impl Decodable for Witness {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TxIn {
     pub prevout: OutPoint,
     pub script: ScriptBuf,
@@ -133,23 +130,41 @@ impl TxIn {
     pub const SEQUENCE_LOCKTIME_MASK: u32 = 0x0000ffff;
     pub const SEQUENCE_LOCKTIME_GRANULARITY: u32 = 9;
 
+    pub fn with_outpoint(prevout: OutPoint) -> TxIn {
+        TxIn {
+            prevout,
+            script: ScriptBuf::new(),
+            sequence: u32::MAX,
+            witness: Witness::default(),
+        }
+    }
+
     /// Returns the base size of this input.
     ///
     /// Base size excludes the witness data (see [`Self::total_size`]).
     pub fn size(&self) -> usize {
         let mut size = OutPoint::SIZE;
 
-        size += VarInt::from(self.script.len()).size();
-        size += self.script.len();
+        // 106 is the common size of a scriptSig
+        // if script is empty, we set the size to 106 to compute the fee size
+        let len = self.script.len();
+        size += VarInt::from(len).size();
+        size += len;
 
         size + 4 // Sequence::SIZE
     }
 
-    /// Returns the total number of bytes that this input contributes to a transaction.
-    ///
-    /// Total size includes the witness data (for base size see [`Self::base_size`]).
-    pub fn total_size(&self) -> usize {
-        self.size() + self.witness.stack.len()
+    /// Returns the estimate number of bytes that this input contributes to a transaction.
+    pub fn estimate_size(&self) -> usize {
+        let mut size = OutPoint::SIZE;
+
+        // 106 is the common size of a scriptSig
+        // if script is empty, we set the size to 106 to compute the fee size
+        let len = self.script.len().max(106);
+        size += VarInt::from(len).size();
+        size += len;
+        size += 4; // Sequence::SIZE
+        size + self.witness.stack.len()
     }
 }
 
@@ -161,6 +176,15 @@ impl Default for TxIn {
             sequence: u32::MAX,
             witness: Witness::default(),
         }
+    }
+}
+
+impl TryFrom<&[u8]> for TxIn {
+    type Error = String;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let mut rd = data;
+        Self::consensus_decode_from_finite_reader(&mut rd).map_err(err_string)
     }
 }
 
@@ -189,7 +213,6 @@ impl Decodable for TxIn {
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct TxOut {
     pub value: u64,
     pub script_pubkey: ScriptBuf,
@@ -201,6 +224,16 @@ impl TxOut {
         let len = self.script_pubkey.len();
         VarInt::from(len).size() + len + 8 // value size
     }
+
+    pub fn estimate_size(&self) -> usize {
+        self.size()
+    }
+
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.consensus_encode(&mut buf).unwrap();
+        buf
+    }
 }
 
 impl Default for TxOut {
@@ -209,6 +242,15 @@ impl Default for TxOut {
             value: u64::MAX,
             script_pubkey: ScriptBuf::new(),
         }
+    }
+}
+
+impl TryFrom<&[u8]> for TxOut {
+    type Error = String;
+
+    fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
+        let mut rd = data;
+        Self::consensus_decode_from_finite_reader(&mut rd).map_err(err_string)
     }
 }
 
@@ -251,7 +293,6 @@ impl Decodable for TxOut {
  * - uint32_t nLockTime
  */
 #[derive(Clone, PartialEq, Eq, Debug, Hash)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Transaction {
     pub version: u32,
     pub lock_time: u32,
@@ -316,6 +357,26 @@ impl Transaction {
         size + 4 // LockTime::SIZE
     }
 
+    pub fn estimate_size(&self) -> usize {
+        let mut size: usize = 4; // Serialized length of a u32 for the version number.
+
+        size += VarInt::from(self.input.len()).size();
+        size += self
+            .input
+            .iter()
+            .map(|input| input.estimate_size())
+            .sum::<usize>();
+
+        size += VarInt::from(self.output.len()).size();
+        size += self
+            .output
+            .iter()
+            .map(|output| output.estimate_size())
+            .sum::<usize>();
+
+        size + 4 // LockTime::SIZE
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         self.consensus_encode(&mut buf).unwrap();
@@ -348,11 +409,11 @@ impl Decodable for Transaction {
 }
 
 impl TryFrom<&[u8]> for Transaction {
-    type Error = encode::Error;
+    type Error = String;
 
     fn try_from(data: &[u8]) -> Result<Self, Self::Error> {
         let mut rd = data;
-        Self::consensus_decode_from_finite_reader(&mut rd)
+        Self::consensus_decode_from_finite_reader(&mut rd).map_err(err_string)
     }
 }
 
