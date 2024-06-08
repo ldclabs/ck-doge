@@ -1,7 +1,11 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_url, Engine};
+use ciborium::into_writer;
+use ck_doge_types::{canister::sha3_256, err_string};
 use ic_cdk::api::management_canister::ecdsa;
 use ic_crypto_extended_bip32::{DerivationIndex, DerivationPath, ExtendedBip32DerivationOutput};
+use icrc_ledger_types::icrc1::account::Account;
+use serde_bytes::ByteBuf;
 
-pub use icrc_ledger_types::icrc1::account::Account;
 pub type ECDSAPublicKey = ecdsa::EcdsaPublicKeyResponse;
 
 /// Returns the derivation path that should be used to sign a message from a
@@ -71,4 +75,27 @@ pub async fn public_key_with(
         .map_err(|err| format!("ecdsa_public_key failed {:?}", err))?;
 
     Ok(response)
+}
+
+// use Idempotent Proxy's Token: Token(pub u64, pub String, pub ByteBuf);
+// https://github.com/ldclabs/idempotent-proxy/blob/main/src/idempotent-proxy-types/src/auth.rs#L15
+pub async fn sign_proxy_token(
+    key_name: &str,
+    expire_at: u64, // UNIX timestamp, in seconds
+    message: &str,  // use RPCAgent.name as message
+) -> Result<String, String> {
+    let mut buf: Vec<u8> = Vec::new();
+    into_writer(&(expire_at, message), &mut buf).expect("failed to encode Token in CBOR format");
+    let digest = sha3_256(&buf);
+    let sig = sign_with(key_name, vec![b"sign_proxy_token".to_vec()], &digest)
+        .await
+        .map_err(err_string)?;
+    buf.clear();
+    into_writer(&(expire_at, message, ByteBuf::from(sig)), &mut buf).map_err(err_string)?;
+    Ok(base64_url.encode(buf))
+}
+
+pub fn proxy_token_public_key(ecdsa_public_key: &ECDSAPublicKey) -> String {
+    let pk = derive_public_key(ecdsa_public_key, vec![b"sign_proxy_token".to_vec()]);
+    base64_url.encode(pk.public_key)
 }

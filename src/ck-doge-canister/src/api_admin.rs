@@ -3,7 +3,7 @@ use ck_doge_types::{canister, jsonrpc::DogecoinRPC};
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use crate::{is_controller, is_controller_or_manager, store, ANONYMOUS, SECONDS};
+use crate::{ecdsa, is_controller, is_controller_or_manager, store, ANONYMOUS, SECONDS};
 
 pub const UPDATE_PROXY_TOKEN_INTERVAL: u64 = 60 * 3; // 3 minute
 const FETCH_BLOCK_INTERVAL: u64 = 20; // 30 seconds
@@ -30,7 +30,7 @@ fn validate_admin_set_managers(args: BTreeSet<Principal>) -> Result<(), String> 
 #[ic_cdk::update(guard = "is_controller_or_manager")]
 async fn admin_set_agent(arg: canister::RPCAgent) -> Result<(), String> {
     let mut rpc_agent = arg;
-    let token = canister::sign_proxy_token(
+    let token = ecdsa::sign_proxy_token(
         &store::state::with(|s| s.ecdsa_key_name.clone()),
         (ic_cdk::api::time() / SECONDS) + UPDATE_PROXY_TOKEN_INTERVAL * 2,
         &rpc_agent.name,
@@ -87,7 +87,7 @@ async fn admin_restart_sync_job() -> Result<(), String> {
 pub async fn update_proxy_token_interval() {
     let (ecdsa_key_name, mut rpc_agent) =
         store::state::with(|s| (s.ecdsa_key_name.clone(), s.rpc_agent.clone()));
-    let token = canister::sign_proxy_token(
+    let token = ecdsa::sign_proxy_token(
         &ecdsa_key_name,
         (ic_cdk::api::time() / SECONDS) + UPDATE_PROXY_TOKEN_INTERVAL * 2,
         &rpc_agent.name,

@@ -6,10 +6,8 @@ use serde_bytes::ByteBuf;
 use sha3::{Digest, Sha3_256};
 
 mod agent;
-mod ecdsa;
 
 pub use agent::*;
-pub use ecdsa::*;
 
 #[derive(CandidType, Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Txid(pub [u8; 32]);

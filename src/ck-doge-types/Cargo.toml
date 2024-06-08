@@ -29,8 +29,6 @@ ic-cdk = { workspace = true }
 sha3 = { workspace = true }
 base64 = { workspace = true }
 bitcoin-io = "0.1"
-ic-crypto-extended-bip32 = { git = "https://github.com/dfinity/ic/", rev = "d19fa446ab35780b2c6d8b82ea32d808cca558d5" }
-icrc-ledger-types = { git = "https://github.com/dfinity/ic/", rev = "d19fa446ab35780b2c6d8b82ea32d808cca558d5" }
 
 [dev-dependencies]
 reqwest = { version = "0.12", features = [

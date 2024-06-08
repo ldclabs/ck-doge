@@ -3,7 +3,7 @@ use candid::{CandidType, Principal};
 use ck_doge_types::canister::*;
 use std::{collections::BTreeSet, str::FromStr};
 
-use crate::store;
+use crate::{store, Account};
 
 #[ic_cdk::query]
 fn api_version() -> u16 {

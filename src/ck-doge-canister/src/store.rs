@@ -20,6 +20,13 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
 };
 
+use crate::{
+    ecdsa::{
+        account_path, derive_public_key, proxy_token_public_key, public_key_with, ECDSAPublicKey,
+    },
+    Account,
+};
+
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 #[derive(Clone, Default, Deserialize, Serialize)]

@@ -4,7 +4,7 @@ use ck_doge_types::{
 use serde_bytes::ByteBuf;
 use std::str::FromStr;
 
-use crate::{is_authenticated, store};
+use crate::{ecdsa, is_authenticated, store, Account};
 
 #[ic_cdk::update(guard = "is_authenticated")]
 async fn send_signed_transaction(
@@ -25,7 +25,7 @@ async fn create_signed_transaction(
     input: canister::CreateSignedTransactionInput,
 ) -> Result<canister::CreateSignedTransactionOutput, String> {
     let addr = script::Address::from_str(&input.address)?;
-    let account = canister::Account {
+    let account = Account {
         owner: ic_cdk::caller(),
         subaccount: None,
     };
@@ -72,12 +72,12 @@ async fn create_signed_transaction(
     }
 
     let input_len = send_tx.input.len();
-    let path = canister::account_path(&account);
+    let path = ecdsa::account_path(&account);
     let mut sighasher = SighashCache::new(&mut send_tx);
 
     for i in 0..input_len {
         let hash = sighasher.signature_hash(i, &script_pubkey, EcdsaSighashType::All)?;
-        let sig = canister::sign_with(&key_name, path.clone(), &hash).await?;
+        let sig = ecdsa::sign_with(&key_name, path.clone(), &hash).await?;
         let signature = Signature::from_compact(&sig).map_err(err_string)?;
         sighasher
             .set_input_script(

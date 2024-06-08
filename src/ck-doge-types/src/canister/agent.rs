@@ -1,19 +1,12 @@
 use async_trait::async_trait;
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_url, Engine};
 use candid::CandidType;
-use ciborium::into_writer;
 use ic_cdk::api::management_canister::http_request::{
     http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs,
     TransformContext,
 };
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
 
-use super::{derive_public_key, sha3_256, sign_with, ECDSAPublicKey};
-use crate::{
-    err_string,
-    jsonrpc::{JsonRPCAgent, APP_AGENT},
-};
+use crate::jsonrpc::{JsonRPCAgent, APP_AGENT};
 
 #[derive(CandidType, Default, Clone, Deserialize, Serialize)]
 pub struct RPCAgent {
@@ -22,29 +15,6 @@ pub struct RPCAgent {
     pub max_cycles: u64,
     pub proxy_token: Option<String>,
     pub api_token: Option<String>,
-}
-
-// use Idempotent Proxy's Token: Token(pub u64, pub String, pub ByteBuf);
-// https://github.com/ldclabs/idempotent-proxy/blob/main/src/idempotent-proxy-types/src/auth.rs#L15
-pub async fn sign_proxy_token(
-    key_name: &str,
-    expire_at: u64, // UNIX timestamp, in seconds
-    message: &str,  // use RPCAgent.name as message
-) -> Result<String, String> {
-    let mut buf: Vec<u8> = Vec::new();
-    into_writer(&(expire_at, message), &mut buf).expect("failed to encode Token in CBOR format");
-    let digest = sha3_256(&buf);
-    let sig = sign_with(key_name, vec![b"sign_proxy_token".to_vec()], &digest)
-        .await
-        .map_err(err_string)?;
-    buf.clear();
-    into_writer(&(expire_at, message, ByteBuf::from(sig)), &mut buf).map_err(err_string)?;
-    Ok(base64_url.encode(buf))
-}
-
-pub fn proxy_token_public_key(ecdsa_public_key: &ECDSAPublicKey) -> String {
-    let pk = derive_public_key(ecdsa_public_key, vec![b"sign_proxy_token".to_vec()]);
-    base64_url.encode(pk.public_key)
 }
 
 #[async_trait]

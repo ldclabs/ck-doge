@@ -1,5 +1,5 @@
 use ciborium::{from_reader, into_writer};
-use ck_doge_types::{canister::*, chainparams::KeyBits};
+use ck_doge_types::chainparams::KeyBits;
 use ic_stable_structures::{storable::Bound, Storable};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
@@ -12,9 +12,6 @@ pub struct State {
     /// The name of the [EcdsaKeyId]. Use "dfx_test_key" for local replica and "test_key_1" for
     /// a testing key for testnet and mainnet
     pub ecdsa_key_name: String,
-
-    /// The Minter ECDSA public key
-    pub ecdsa_public_key: Option<ECDSAPublicKey>,
 }
 
 impl Storable for State {
