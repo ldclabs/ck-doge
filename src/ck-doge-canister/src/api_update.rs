@@ -35,13 +35,13 @@ async fn create_signed_transaction(
     let pubkey = PublicKey::from_slice(&mykey.public_key).map_err(err_string)?;
     let script_pubkey = myaddr.to_script(chain);
 
-    let uxtos = store::list_uxtos(&myaddr.0, 1000, false);
-    let total_value: u64 = uxtos.iter().map(|u| u.value).sum();
+    let utxos = store::list_utxos(&myaddr.0, 1000, false);
+    let total_value: u64 = utxos.iter().map(|u| u.value).sum();
 
     let mut send_tx = Transaction {
         version: Transaction::CURRENT_VERSION,
         lock_time: 0,
-        input: uxtos.into_iter().map(|u| u.into()).collect(),
+        input: utxos.into_iter().map(|u| u.into()).collect(),
         output: vec![
             TxOut {
                 value: input.amount,
@@ -77,7 +77,7 @@ async fn create_signed_transaction(
 
     for i in 0..input_len {
         let hash = sighasher.signature_hash(i, &script_pubkey, EcdsaSighashType::All)?;
-        let sig = ecdsa::sign_with(&key_name, path.clone(), &hash).await?;
+        let sig = ecdsa::sign_with(&key_name, path.clone(), *hash).await?;
         let signature = Signature::from_compact(&sig).map_err(err_string)?;
         sighasher
             .set_input_script(

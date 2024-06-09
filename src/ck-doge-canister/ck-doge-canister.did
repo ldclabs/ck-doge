@@ -65,13 +65,13 @@ service : (opt InitArg) -> {
   create_signed_transaction : (CreateSignedTransactionInput) -> (Result_1);
   get_address : () -> (Result_2) composite_query;
   get_tip : () -> (Result_3) composite_query;
-  get_tx : (text) -> (Result_4) composite_query;
-  list_uxtos : (text, nat16, bool) -> (Result_5) composite_query;
+  get_utx : (text) -> (Result_4) composite_query;
+  list_utxos : (text, nat16, bool) -> (Result_5) composite_query;
   query_address : () -> (Result_2) query;
   query_balance : (text) -> (Result_6) query;
   query_state : () -> (Result_7) query;
-  query_tx : (text) -> (Result_4) query;
-  query_uxtos : (text, nat16, bool) -> (Result_5) query;
+  query_utx : (text) -> (Result_4) query;
+  query_utxos : (text, nat16, bool) -> (Result_5) query;
   send_signed_transaction : (SendSignedTransactionInput) -> (Result_8);
   validate_admin_set_managers : (vec principal) -> (Result);
 }

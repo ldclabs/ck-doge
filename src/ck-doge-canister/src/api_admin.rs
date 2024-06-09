@@ -52,7 +52,7 @@ async fn admin_set_agent(mut arg: canister::RPCAgent) -> Result<(), String> {
 #[ic_cdk::update(guard = "is_controller_or_manager")]
 async fn admin_restart_syncing() -> Result<(), String> {
     store::state::with_mut(|s| s.last_errors.clear());
-    match store::syncing::with_mut(|s| s.sync_job_running) {
+    match store::syncing::with_mut(|s| s.status) {
         0 | -1 => {
             ic_cdk_timers::set_timer(Duration::from_secs(0), || {
                 ic_cdk::spawn(syncing::fetch_block())

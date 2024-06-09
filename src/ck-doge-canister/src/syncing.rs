@@ -36,7 +36,7 @@ enum FetchBlockError {
 
 pub async fn fetch_block() {
     // let start = ic_cdk::api::performance_counter(1);
-    store::syncing::with_mut(|s| s.sync_job_running = 1);
+    store::syncing::with_mut(|s| s.status = 1);
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();
         let (tip_height, tip_blockhash) = store::state::with(|s| (s.tip_height, s.tip_blockhash));
@@ -64,7 +64,7 @@ pub async fn fetch_block() {
 
     match res {
         Err(FetchBlockError::Other(err)) => {
-            store::syncing::with_mut(|s| s.sync_job_running = -1);
+            store::syncing::with_mut(|s| s.status = -1);
             store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }
@@ -83,10 +83,10 @@ pub async fn fetch_block() {
 
 fn process_block() {
     // let start = ic_cdk::api::performance_counter(1);
-    store::syncing::with_mut(|s| s.sync_job_running = 2);
+    store::syncing::with_mut(|s| s.status = 2);
     match store::process_block() {
         Err(err) => {
-            store::syncing::with_mut(|s| s.sync_job_running = -2);
+            store::syncing::with_mut(|s| s.status = -2);
             store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }
@@ -106,10 +106,10 @@ fn process_block() {
 
 fn confirm_utxos() {
     // let start = ic_cdk::api::performance_counter(1);
-    store::syncing::with_mut(|s| s.sync_job_running = 3);
+    store::syncing::with_mut(|s| s.status = 3);
     match store::confirm_utxos() {
         Err(err) => {
-            store::syncing::with_mut(|s| s.sync_job_running = -3);
+            store::syncing::with_mut(|s| s.status = -3);
             store::state::with_mut(|s| s.append_error(err.clone()));
             ic_cdk::trap(&err);
         }

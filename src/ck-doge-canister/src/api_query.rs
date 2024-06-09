@@ -102,21 +102,21 @@ fn get_address() -> Result<String, String> {
 }
 
 #[ic_cdk::query]
-fn query_tx(id: String) -> Result<UnspentTx, String> {
+fn query_utx(id: String) -> Result<UnspentTx, String> {
     let txid = Txid::from_str(&id)?;
-    store::get_tx(&txid.0).ok_or(format!("tx {id} not found"))
+    store::get_utx(&txid.0).ok_or(format!("tx {id} not found"))
 }
 
 #[ic_cdk::query(composite = true)]
-fn get_tx(id: String) -> Result<UnspentTx, String> {
+fn get_utx(id: String) -> Result<UnspentTx, String> {
     let txid = Txid::from_str(&id)?;
-    store::get_tx(&txid.0).ok_or(format!("tx {id} not found"))
+    store::get_utx(&txid.0).ok_or(format!("tx {id} not found"))
 }
 
 #[ic_cdk::query]
-fn query_uxtos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
+fn query_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
     let address = Address::from_str(&addr)?;
-    Ok(store::list_uxtos(
+    Ok(store::list_utxos(
         &address.0,
         take.max(10).min(10000) as usize,
         confirmed,
@@ -124,9 +124,9 @@ fn query_uxtos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, St
 }
 
 #[ic_cdk::query(composite = true)]
-fn list_uxtos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
+fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
     let address = Address::from_str(&addr)?;
-    Ok(store::list_uxtos(
+    Ok(store::list_utxos(
         &address.0,
         take.max(10).min(10000) as usize,
         confirmed,

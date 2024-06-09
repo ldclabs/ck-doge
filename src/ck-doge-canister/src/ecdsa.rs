@@ -39,7 +39,7 @@ pub fn derive_public_key(
 pub async fn sign_with(
     key_name: &str,
     derivation_path: Vec<Vec<u8>>,
-    message_hash: &[u8; 32],
+    message_hash: [u8; 32],
 ) -> Result<Vec<u8>, String> {
     let args = ecdsa::SignWithEcdsaArgument {
         message_hash: message_hash.to_vec(),
@@ -87,7 +87,7 @@ pub async fn sign_proxy_token(
     let mut buf: Vec<u8> = Vec::new();
     into_writer(&(expire_at, message), &mut buf).expect("failed to encode Token in CBOR format");
     let digest = sha3_256(&buf);
-    let sig = sign_with(key_name, vec![b"sign_proxy_token".to_vec()], &digest)
+    let sig = sign_with(key_name, vec![b"sign_proxy_token".to_vec()], digest)
         .await
         .map_err(err_string)?;
     buf.clear();

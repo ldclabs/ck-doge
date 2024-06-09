@@ -168,7 +168,7 @@ const XO_MEMORY_ID: MemoryId = MemoryId::new(2);
 
 #[derive(Default)]
 pub struct SyncingState {
-    pub sync_job_running: i8, // 0: not running, > 0: running, < 0: stop because of error
+    pub status: i8, // 0: not running, > 0: running, < 0: stop because of error
     pub refresh_proxy_token_timer: Option<ic_cdk_timers::TimerId>,
 }
 
@@ -461,7 +461,7 @@ pub fn confirm_utxos() -> Result<bool, String> {
     })
 }
 
-pub fn get_tx(txid: &[u8; 32]) -> Option<UnspentTx> {
+pub fn get_utx(txid: &[u8; 32]) -> Option<UnspentTx> {
     state::with(|s| match s.unconfirmed_utxs.get(txid) {
         Some(utx) => Some(UnspentTx::from(utx.clone())),
         None => UT.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
@@ -481,7 +481,7 @@ pub fn get_balance(addr: &[u8; 21]) -> u64 {
     res.into_iter().map(|v| v.4).sum()
 }
 
-pub fn list_uxtos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
+pub fn list_utxos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
     let mut res = XO.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     if !confirmed {
         state::with(|s| {
