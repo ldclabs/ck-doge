@@ -58,7 +58,7 @@ type UnspentTx = record {
 };
 type Utxo = record { height : nat64; value : nat64; txid : blob; vout : nat32 };
 service : (opt InitArg) -> {
-  admin_restart_sync_job : () -> (Result);
+  admin_restart_syncing : () -> (Result);
   admin_set_agent : (RPCAgent) -> (Result);
   admin_set_managers : (vec principal) -> (Result);
   api_version : () -> (nat16) query;

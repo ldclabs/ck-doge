@@ -13,7 +13,7 @@ async fn send_signed_transaction(
     let tx = Transaction::try_from(input.tx.as_ref())?;
     let txid = tx.compute_txid();
     let agent = store::state::get_agent();
-    let txid = DogecoinRPC::send_transaction(&agent, &txid.to_string(), &tx).await?;
+    let txid = DogecoinRPC::send_transaction(&agent, txid.to_string(), &tx).await?;
     Ok(canister::SendSignedTransactionOutput {
         txid: txid.into(),
         instructions: ic_cdk::api::performance_counter(1),

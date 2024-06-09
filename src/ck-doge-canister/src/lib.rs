@@ -13,6 +13,7 @@ mod api_query;
 mod api_update;
 mod ecdsa;
 mod store;
+mod syncing;
 
 static ANONYMOUS: Principal = Principal::anonymous();
 const SECONDS: u64 = 1_000_000_000u64;

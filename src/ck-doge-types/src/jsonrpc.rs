@@ -18,7 +18,7 @@ pub static APP_AGENT: &str = concat!(
 
 #[async_trait]
 pub trait JsonRPCAgent {
-    async fn post(&self, idempotency_key: &str, body: Vec<u8>) -> Result<bytes::Bytes, String>;
+    async fn post(&self, idempotency_key: String, body: Vec<u8>) -> Result<bytes::Bytes, String>;
 }
 
 pub struct DogecoinRPC {}
@@ -51,13 +51,13 @@ impl From<&BlockRef> for BlockHash {
 }
 
 impl DogecoinRPC {
-    pub async fn ping(agent: impl JsonRPCAgent, idempotency_key: &str) -> Result<(), String> {
+    pub async fn ping(agent: impl JsonRPCAgent, idempotency_key: String) -> Result<(), String> {
         Self::call(agent, idempotency_key, "ping", &[]).await
     }
 
     pub async fn get_best_blockhash(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
     ) -> Result<BlockHash, String> {
         let hex: String = Self::call(agent, idempotency_key, "getbestblockhash", &[]).await?;
         BlockHash::from_str(&hex).map_err(err_string)
@@ -65,7 +65,7 @@ impl DogecoinRPC {
 
     pub async fn get_blockhash(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         height: u64,
     ) -> Result<BlockHash, String> {
         let hex: String =
@@ -75,7 +75,7 @@ impl DogecoinRPC {
 
     pub async fn get_block(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         hash: &BlockHash,
     ) -> Result<Block, String> {
         let hex: String = Self::call(
@@ -90,7 +90,7 @@ impl DogecoinRPC {
 
     pub async fn wait_for_new_block(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         timeout_ms: u64,
     ) -> Result<BlockRef, String> {
         Self::call(
@@ -104,7 +104,7 @@ impl DogecoinRPC {
 
     pub async fn get_transaction(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         hash: &Txid,
     ) -> Result<Transaction, String> {
         let hex: String = Self::call(
@@ -119,7 +119,7 @@ impl DogecoinRPC {
 
     pub async fn send_transaction(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         tx: &Transaction,
     ) -> Result<Txid, String> {
         let hex: String = Self::call(
@@ -134,7 +134,7 @@ impl DogecoinRPC {
 
     pub async fn send_rawtransaction(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         raw: &[u8],
     ) -> Result<Txid, String> {
         let hex: String = Self::call(
@@ -149,7 +149,7 @@ impl DogecoinRPC {
 
     pub async fn call<T: DeserializeOwned>(
         agent: impl JsonRPCAgent,
-        idempotency_key: &str,
+        idempotency_key: String,
         method: &str,
         params: &[Value],
     ) -> Result<T, String> {
@@ -252,7 +252,7 @@ mod tests {
     impl JsonRPCAgent for &RPCAgent {
         async fn post(
             &self,
-            _idempotency_key: &str,
+            _idempotency_key: String,
             body: Vec<u8>,
         ) -> Result<bytes::Bytes, String> {
             let req = self.client.post(self.url.clone()).body(body);
@@ -293,12 +293,14 @@ mod tests {
         dotenv().expect(".env file not found");
 
         let agent = RPCAgent::new();
-        assert!(DogecoinRPC::ping(&agent, "").await.is_ok());
+        assert!(DogecoinRPC::ping(&agent, "".to_string()).await.is_ok());
 
-        let best_blockhash = DogecoinRPC::get_best_blockhash(&agent, "").await.unwrap();
+        let best_blockhash = DogecoinRPC::get_best_blockhash(&agent, "".to_string())
+            .await
+            .unwrap();
         println!("best_blockhash: {:?}", best_blockhash);
 
-        let block = DogecoinRPC::get_block(&agent, "", &best_blockhash)
+        let block = DogecoinRPC::get_block(&agent, "".to_string(), &best_blockhash)
             .await
             .unwrap();
         println!("block: {:?}", block);
@@ -310,7 +312,7 @@ mod tests {
         dotenv().expect(".env file not found");
 
         let agent = RPCAgent::new();
-        assert!(DogecoinRPC::ping(&agent, "").await.is_ok());
+        assert!(DogecoinRPC::ping(&agent, "".to_string()).await.is_ok());
 
         let mut height = 5240740u64;
         let mut prev_blockhash =
@@ -323,7 +325,7 @@ mod tests {
         let mut i = 10;
         while i > 0 && prev_blockhash != BlockHash::default() {
             i -= 1;
-            match DogecoinRPC::get_block(&agent, "", &prev_blockhash).await {
+            match DogecoinRPC::get_block(&agent, "".to_string(), &prev_blockhash).await {
                 Ok(block) => {
                     println!("Block({}): {:?}", height, prev_blockhash);
                     height -= 1;

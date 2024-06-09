@@ -49,7 +49,7 @@ impl RPCAgent {
 
 #[async_trait]
 impl JsonRPCAgent for &RPCAgent {
-    async fn post(&self, _idempotency_key: &str, body: Vec<u8>) -> Result<bytes::Bytes, String> {
+    async fn post(&self, _idempotency_key: String, body: Vec<u8>) -> Result<bytes::Bytes, String> {
         let req = self.client.post(self.url.clone()).body(body);
         let res = req.send().await.map_err(err_string)?;
         if res.status().is_success() {
@@ -71,7 +71,7 @@ async fn main() {
     dotenv().expect(".env file not found");
 
     let agent = RPCAgent::new();
-    assert!(DogecoinRPC::ping(&agent, "").await.is_ok());
+    assert!(DogecoinRPC::ping(&agent, "".to_string()).await.is_ok());
 
     let mut height = 5179564u64;
     let mut prev_blockhash =
@@ -82,7 +82,7 @@ async fn main() {
     // println!("best_blockhash: {:?}", prev_blockhash);
 
     while prev_blockhash != BlockHash::default() {
-        match DogecoinRPC::get_block(&agent, "", &prev_blockhash).await {
+        match DogecoinRPC::get_block(&agent, prev_blockhash.to_string(), &prev_blockhash).await {
             Ok(block) => {
                 println!("Block({}): {:?}", height, prev_blockhash);
                 assert_eq!(block.block_hash(), prev_blockhash);

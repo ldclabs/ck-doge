@@ -31,5 +31,5 @@ once_cell = { workspace = true }
 ic-cdk-timers = { workspace = true }
 ic-stable-structures = { workspace = true }
 lazy_static = { workspace = true }
-ck-doge-types = { path = "../ck-doge-types", version = "0.2" }
+ck-doge-types = { path = "../ck-doge-types", version = "0.3" }
 getrandom = { version = "0.2", features = ["custom"] }

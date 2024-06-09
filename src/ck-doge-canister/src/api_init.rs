@@ -3,10 +3,7 @@ use ck_doge_types::block::BlockHash;
 use serde::Deserialize;
 use std::{str::FromStr, time::Duration};
 
-use crate::api_admin::{
-    sync_job_fetch_block, update_proxy_token_interval, UPDATE_PROXY_TOKEN_INTERVAL,
-};
-use crate::store;
+use crate::{store, syncing};
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub struct InitArg {
@@ -45,14 +42,14 @@ fn pre_upgrade() {
 fn post_upgrade() {
     store::state::load();
 
-    store::state::runtime_mut(|s| {
+    store::syncing::with_mut(|s| {
         ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-            ic_cdk::spawn(sync_job_fetch_block())
+            ic_cdk::spawn(syncing::fetch_block())
         });
 
-        s.update_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(
-            Duration::from_secs(UPDATE_PROXY_TOKEN_INTERVAL),
-            || ic_cdk::spawn(update_proxy_token_interval()),
+        s.refresh_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(
+            Duration::from_secs(syncing::REFRESH_PROXY_TOKEN_INTERVAL),
+            || ic_cdk::spawn(syncing::refresh_proxy_token()),
         ));
     });
 }

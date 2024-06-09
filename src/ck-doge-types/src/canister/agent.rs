@@ -19,7 +19,7 @@ pub struct RPCAgent {
 
 #[async_trait]
 impl JsonRPCAgent for &RPCAgent {
-    async fn post(&self, idempotency_key: &str, body: Vec<u8>) -> Result<bytes::Bytes, String> {
+    async fn post(&self, idempotency_key: String, body: Vec<u8>) -> Result<bytes::Bytes, String> {
         // let start = ic_cdk::api::performance_counter(1);
         let mut request_headers = vec![
             HttpHeader {
@@ -38,7 +38,7 @@ impl JsonRPCAgent for &RPCAgent {
             },
             HttpHeader {
                 name: "idempotency-key".to_string(),
-                value: idempotency_key.to_string(),
+                value: idempotency_key,
             },
         ];
 

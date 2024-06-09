@@ -167,15 +167,15 @@ const UT_MEMORY_ID: MemoryId = MemoryId::new(1);
 const XO_MEMORY_ID: MemoryId = MemoryId::new(2);
 
 #[derive(Default)]
-pub struct RuntimeState {
+pub struct SyncingState {
     pub sync_job_running: i8, // 0: not running, > 0: running, < 0: stop because of error
-    pub update_proxy_token_timer: Option<ic_cdk_timers::TimerId>,
+    pub refresh_proxy_token_timer: Option<ic_cdk_timers::TimerId>,
 }
 
 thread_local! {
     static STATE_HEAP: RefCell<State> = RefCell::new(State::default());
 
-    static RUNTIME_STATE: RefCell<RuntimeState> = RefCell::new(RuntimeState::default());
+    static SYNCING_STATE: RefCell<SyncingState> = RefCell::new(SyncingState::default());
 
     static UNPROCESSED_BLOCKS: RefCell<VecDeque<(u64, BlockHash, Block)>> =const { RefCell::new(VecDeque::new()) };
 
@@ -204,6 +204,18 @@ thread_local! {
             MEMORY_MANAGER.with_borrow(|m| m.get(XO_MEMORY_ID)),
         )
     );
+}
+
+pub mod syncing {
+    use super::*;
+
+    pub fn with<R>(f: impl FnOnce(&SyncingState) -> R) -> R {
+        SYNCING_STATE.with(|r| f(&r.borrow()))
+    }
+
+    pub fn with_mut<R>(f: impl FnOnce(&mut SyncingState) -> R) -> R {
+        SYNCING_STATE.with(|r| f(&mut r.borrow_mut()))
+    }
 }
 
 pub mod state {
@@ -235,14 +247,6 @@ pub mod state {
 
     pub fn with_mut<R>(f: impl FnOnce(&mut State) -> R) -> R {
         STATE_HEAP.with(|r| f(&mut r.borrow_mut()))
-    }
-
-    pub fn runtime<R>(f: impl FnOnce(&RuntimeState) -> R) -> R {
-        RUNTIME_STATE.with(|r| f(&r.borrow()))
-    }
-
-    pub fn runtime_mut<R>(f: impl FnOnce(&mut RuntimeState) -> R) -> R {
-        RUNTIME_STATE.with(|r| f(&mut r.borrow_mut()))
     }
 
     pub async fn init_ecdsa_public_key() {

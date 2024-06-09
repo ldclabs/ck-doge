@@ -53,7 +53,7 @@ impl RPCAgent {
 
 #[async_trait]
 impl JsonRPCAgent for &RPCAgent {
-    async fn post(&self, _idempotency_key: &str, body: Vec<u8>) -> Result<bytes::Bytes, String> {
+    async fn post(&self, _idempotency_key: String, body: Vec<u8>) -> Result<bytes::Bytes, String> {
         let req = self.client.post(self.url.clone()).body(body);
         let res = req.send().await.map_err(err_string)?;
         if res.status().is_success() {
@@ -74,19 +74,19 @@ async fn main() {
     dotenv().expect(".env file not found");
 
     let agent = RPCAgent::new();
-    assert!(DogecoinRPC::ping(&agent, "").await.is_ok());
+    assert!(DogecoinRPC::ping(&agent, "".to_string()).await.is_ok());
 
     let chain = &DOGE_TEST_NET_CHAIN;
 
     let txid1 =
         Txid::from_str("adbf6cc9fb3ce82717565a2e10c935a9dd02503c36dab36fd9b3e768f9ae5fab").unwrap();
-    let tx1 = DogecoinRPC::get_transaction(&agent, "", &txid1)
+    let tx1 = DogecoinRPC::get_transaction(&agent, txid1.to_string(), &txid1)
         .await
         .unwrap();
     println!("tx1: {:?}", tx1);
     let txid2 =
         Txid::from_str("374001013da664efee39b3a56919dbe009f9d1149f0bfbcd9f77c63c77284fe4").unwrap();
-    let tx2 = DogecoinRPC::get_transaction(&agent, "", &txid2)
+    let tx2 = DogecoinRPC::get_transaction(&agent, txid2.to_string(), &txid2)
         .await
         .unwrap();
     println!("tx2: {:?}", tx2);
@@ -152,12 +152,13 @@ async fn main() {
         )
         .unwrap();
 
+    let txid = sighasher.transaction().compute_txid();
+    println!("txid: {:?}", txid);
     println!("signed tx: {:?}", sighasher.transaction());
-    println!("signed txid: {:?}", sighasher.transaction().compute_txid());
     println!("tx size: {:?}", sighasher.transaction().size());
     assert_eq!(sighasher.transaction().size(), 339);
 
-    let txid = DogecoinRPC::send_transaction(&agent, "", sighasher.transaction())
+    let txid = DogecoinRPC::send_transaction(&agent, txid.to_string(), sighasher.transaction())
         .await
         .unwrap();
 
