@@ -87,12 +87,12 @@ impl Storable for State {
 
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode MinterState data");
+        into_writer(self, &mut buf).expect("failed to encode State data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode MinterState data")
+        from_reader(&bytes[..]).expect("failed to decode State data")
     }
 }
 
@@ -116,12 +116,12 @@ impl Storable for UnspentTxState {
 
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode MinterState data");
+        into_writer(self, &mut buf).expect("failed to encode UnspentTxState data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode MinterState data")
+        from_reader(&bytes[..]).expect("failed to decode UnspentTxState data")
     }
 }
 
@@ -154,12 +154,12 @@ impl Storable for UtxoStates {
 
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode MinterState data");
+        into_writer(self, &mut buf).expect("failed to encode UtxoStates data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode MinterState data")
+        from_reader(&bytes[..]).expect("failed to decode UtxoStates data")
     }
 }
 

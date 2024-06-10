@@ -407,6 +407,7 @@ name = "ck-doge-minter"
 version = "0.3.0"
 dependencies = [
  "base64 0.21.7",
+ "bitcoin",
  "bytes",
  "candid",
  "ciborium",
@@ -415,7 +416,9 @@ dependencies = [
  "hex-conservative",
  "ic-cdk 0.13.2",
  "ic-cdk-timers",
+ "ic-crypto-extended-bip32",
  "ic-stable-structures",
+ "icrc-ledger-types",
  "lazy_static",
  "num-traits",
  "once_cell",
