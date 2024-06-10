@@ -3,7 +3,7 @@ use candid::{CandidType, Principal};
 use ck_doge_types::canister::*;
 use std::{collections::BTreeSet, str::FromStr};
 
-use crate::{is_controller_or_manager, store, Account};
+use crate::{is_authenticated, is_controller_or_manager, store, Account};
 
 #[ic_cdk::query]
 fn api_version() -> u16 {
@@ -80,7 +80,7 @@ fn get_tip() -> Result<BlockRef, String> {
     })
 }
 
-#[ic_cdk::query]
+#[ic_cdk::query(guard = "is_authenticated")]
 fn get_address() -> Result<String, String> {
     let addr = store::get_address(&Account {
         owner: ic_cdk::caller(),
