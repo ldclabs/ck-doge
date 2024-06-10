@@ -9,7 +9,6 @@ const FETCH_BLOCK_AFTER: u64 = 20; // 20 seconds
 pub async fn refresh_proxy_token() {
     let (ecdsa_key_name, mut rpc_agent) =
         store::state::with(|s| (s.ecdsa_key_name.clone(), s.rpc_agent.clone()));
-    // let start = ic_cdk::api::performance_counter(1);
     let token = ecdsa::sign_proxy_token(
         &ecdsa_key_name,
         (ic_cdk::api::time() / SECONDS) + REFRESH_PROXY_TOKEN_INTERVAL + 120,
@@ -18,11 +17,6 @@ pub async fn refresh_proxy_token() {
     .await
     .expect("failed to sign proxy token");
 
-    // ic_cdk::println!(
-    //     "refresh_proxy_token: {}, {}",
-    //     ic_cdk::api::performance_counter(1) - start,
-    //     token
-    // );
     rpc_agent.proxy_token = Some(token);
     store::state::with_mut(|r| {
         r.rpc_agent = rpc_agent;
@@ -35,7 +29,6 @@ enum FetchBlockError {
 }
 
 pub async fn fetch_block() {
-    // let start = ic_cdk::api::performance_counter(1);
     store::syncing::with_mut(|s| s.status = 1);
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();
@@ -57,11 +50,6 @@ pub async fn fetch_block() {
     }
     .await;
 
-    // ic_cdk::println!(
-    //     "fetch_block: {}",
-    //     ic_cdk::api::performance_counter(1) - start,
-    // );
-
     match res {
         Err(FetchBlockError::Other(err)) => {
             store::syncing::with_mut(|s| s.status = -1);
@@ -82,7 +70,6 @@ pub async fn fetch_block() {
 }
 
 fn process_block() {
-    // let start = ic_cdk::api::performance_counter(1);
     store::syncing::with_mut(|s| s.status = 2);
     match store::process_block() {
         Err(err) => {
@@ -91,10 +78,6 @@ fn process_block() {
             ic_cdk::trap(&err);
         }
         Ok(res) => {
-            // ic_cdk::println!(
-            //     "process_block: {}",
-            //     ic_cdk::api::performance_counter(1) - start,
-            // );
             if res {
                 ic_cdk_timers::set_timer(Duration::from_secs(0), confirm_utxos);
             } else {
@@ -105,7 +88,6 @@ fn process_block() {
 }
 
 fn confirm_utxos() {
-    // let start = ic_cdk::api::performance_counter(1);
     store::syncing::with_mut(|s| s.status = 3);
     match store::confirm_utxos() {
         Err(err) => {
@@ -114,10 +96,6 @@ fn confirm_utxos() {
             ic_cdk::trap(&err);
         }
         Ok(res) => {
-            // ic_cdk::println!(
-            //     "confirm_utxos: {}",
-            //     ic_cdk::api::performance_counter(1) - start,
-            // );
             if res {
                 ic_cdk_timers::set_timer(Duration::from_secs(0), process_block);
             } else {

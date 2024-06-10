@@ -20,7 +20,6 @@ pub struct RPCAgent {
 #[async_trait]
 impl JsonRPCAgent for &RPCAgent {
     async fn post(&self, idempotency_key: String, body: Vec<u8>) -> Result<bytes::Bytes, String> {
-        // let start = ic_cdk::api::performance_counter(1);
         let mut request_headers = vec![
             HttpHeader {
                 name: "content-type".to_string(),
@@ -70,10 +69,6 @@ impl JsonRPCAgent for &RPCAgent {
 
         match http_request(request, self.max_cycles as u128).await {
             Ok((res,)) => {
-                // ic_cdk::println!(
-                //     "http_request: {}",
-                //     ic_cdk::api::performance_counter(1) - start,
-                // );
                 if res.status >= 200u64 && res.status < 300u64 {
                     Ok(bytes::Bytes::from(res.body))
                 } else {

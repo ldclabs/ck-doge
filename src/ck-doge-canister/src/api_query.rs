@@ -21,26 +21,25 @@ pub struct State {
     pub confirmed_height: u64,
     pub start_height: u64,
     pub start_blockhash: String,
+    pub unprocessed_blocks: u64,
+    pub unconfirmed_utxs: u64,
+    pub unconfirmed_utxos: u64,
+    pub confirmed_utxs: u64,
+    pub confirmed_utxos: u64,
     pub last_errors: Vec<String>,
     pub managers: BTreeSet<Principal>,
     // manager info
     pub rpc_proxy_public_key: Option<String>,
-    pub unprocessed_blocks: Option<u64>,
-    pub unconfirmed_utxs: Option<u64>,
-    pub unconfirmed_utxos: Option<u64>,
-    pub confirmed_utxs: Option<u64>,
-    pub confirmed_utxos: Option<u64>,
     pub rpc_agent: Option<RPCAgent>,
     pub ecdsa_key_name: Option<String>,
 }
 
 #[ic_cdk::query]
-fn query_state() -> Result<State, ()> {
+fn get_state() -> Result<State, ()> {
     Ok(store::state::with(|s| {
         let mut res = State {
             chain: s.chain_params().chain_name.to_string(),
             min_confirmations: s.min_confirmations,
-
             tip_height: s.tip_height,
             tip_blockhash: sha256d::Hash::from_bytes_ref(&s.tip_blockhash).to_string(),
             processed_height: s.processed_height,
@@ -48,6 +47,11 @@ fn query_state() -> Result<State, ()> {
             confirmed_height: s.confirmed_height,
             start_height: s.start_height,
             start_blockhash: sha256d::Hash::from_bytes_ref(&s.start_blockhash).to_string(),
+            unprocessed_blocks: store::state::get_unprocessed_blocks_len(),
+            unconfirmed_utxs: s.unconfirmed_utxs.len() as u64,
+            unconfirmed_utxos: s.unconfirmed_utxos.len() as u64,
+            confirmed_utxs: store::state::get_confirmed_utxs_len(),
+            confirmed_utxos: store::state::get_confirmed_utxos_len(),
             last_errors: s.last_errors.clone().into(),
             managers: s.managers.clone(),
             ..Default::default()
@@ -56,18 +60,13 @@ fn query_state() -> Result<State, ()> {
         if is_controller_or_manager().is_ok() {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
             res.rpc_proxy_public_key = Some(s.rpc_proxy_public_key.clone());
-            res.unconfirmed_utxs = Some(s.unconfirmed_utxs.len() as u64);
-            res.unconfirmed_utxos = Some(s.unconfirmed_utxos.len() as u64);
-            res.unprocessed_blocks = Some(store::state::get_unprocessed_blocks_len());
-            res.confirmed_utxs = Some(store::state::get_confirmed_utxs_len());
-            res.confirmed_utxos = Some(store::state::get_confirmed_utxos_len());
             res.rpc_agent = Some(s.rpc_agent.clone());
         }
         res
     }))
 }
 
-#[ic_cdk::query(composite = true)]
+#[ic_cdk::query]
 fn get_tip() -> Result<BlockRef, String> {
     store::state::with(|s| {
         if s.tip_height == 0 {
@@ -82,16 +81,6 @@ fn get_tip() -> Result<BlockRef, String> {
 }
 
 #[ic_cdk::query]
-fn query_address() -> Result<String, String> {
-    let addr = store::get_address(&Account {
-        owner: ic_cdk::caller(),
-        subaccount: None,
-    })?;
-
-    Ok(addr.to_string())
-}
-
-#[ic_cdk::query(composite = true)]
 fn get_address() -> Result<String, String> {
     let addr = store::get_address(&Account {
         owner: ic_cdk::caller(),
@@ -102,28 +91,17 @@ fn get_address() -> Result<String, String> {
 }
 
 #[ic_cdk::query]
-fn query_utx(id: String) -> Result<UnspentTx, String> {
-    let txid = Txid::from_str(&id)?;
-    store::get_utx(&txid.0).ok_or(format!("tx {id} not found"))
-}
-
-#[ic_cdk::query(composite = true)]
 fn get_utx(id: String) -> Result<UnspentTx, String> {
     let txid = Txid::from_str(&id)?;
     store::get_utx(&txid.0).ok_or(format!("tx {id} not found"))
 }
 
 #[ic_cdk::query]
-fn query_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
-    let address = Address::from_str(&addr)?;
-    Ok(store::list_utxos(
-        &address.0,
-        take.max(10).min(10000) as usize,
-        confirmed,
-    ))
+fn get_utx_b(txid: [u8; 32]) -> Option<UnspentTx> {
+    store::get_utx(&txid)
 }
 
-#[ic_cdk::query(composite = true)]
+#[ic_cdk::query]
 fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
     let address = Address::from_str(&addr)?;
     Ok(store::list_utxos(
@@ -134,7 +112,17 @@ fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, Str
 }
 
 #[ic_cdk::query]
-fn query_balance(addr: String) -> Result<u64, String> {
+fn list_utxos_b(address: [u8; 21], take: u16, confirmed: bool) -> Vec<Utxo> {
+    store::list_utxos(&address, take.max(10).min(10000) as usize, confirmed)
+}
+
+#[ic_cdk::query]
+fn get_balance(addr: String) -> Result<u64, String> {
     let address = Address::from_str(&addr)?;
     Ok(store::get_balance(&address.0))
+}
+
+#[ic_cdk::query]
+fn get_balance_b(address: [u8; 21]) -> u64 {
+    store::get_balance(&address)
 }
