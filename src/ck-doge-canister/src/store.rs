@@ -66,6 +66,7 @@ pub struct State {
 
     pub unconfirmed_utxs: BTreeMap<[u8; 32], UnspentTxState>,
     pub unconfirmed_utxos: BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    processed_blocks: VecDeque<(u64, [u8; 32])>,
 }
 
 impl State {
@@ -178,8 +179,6 @@ thread_local! {
     static SYNCING_STATE: RefCell<SyncingState> = RefCell::new(SyncingState::default());
 
     static UNPROCESSED_BLOCKS: RefCell<VecDeque<(u64, BlockHash, Block)>> =const { RefCell::new(VecDeque::new()) };
-
-    static PROCESSED_BLOCKS: RefCell<VecDeque<(u64, BlockHash)>> =const { RefCell::new(VecDeque::new()) };
 
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
@@ -355,8 +354,7 @@ pub fn clear_for_restart_process_block() {
 pub fn process_block() -> Result<bool, String> {
     state::with_mut(|s| {
         UNPROCESSED_BLOCKS.with(|r| {
-            let mut q = r.borrow_mut();
-            match q.pop_front() {
+            match r.borrow_mut().pop_front() {
                 None => Ok(false),
                 Some((height, hash, block)) => {
                     if s.processed_height != 0 && height != s.processed_height + 1 {
@@ -397,9 +395,13 @@ pub fn process_block() -> Result<bool, String> {
                         Ok::<(), String>(())
                     })?;
 
-                    PROCESSED_BLOCKS.with(|r| r.borrow_mut().push_back((height, hash)));
                     s.processed_height = height;
                     s.processed_blockhash = *hash;
+                    s.processed_blocks.push_back((height, *hash));
+                    if s.start_height == 0 && s.start_blockhash == [0u8; 32] {
+                        s.start_height = s.processed_height;
+                        s.start_blockhash = s.processed_blockhash;
+                    }
                     Ok(true)
                 }
             }
@@ -410,10 +412,10 @@ pub fn process_block() -> Result<bool, String> {
 // we should clear all unconfirmed states.
 pub fn clear_for_restart_confirm_utxos() {
     UNPROCESSED_BLOCKS.with(|r| r.borrow_mut().clear());
-    PROCESSED_BLOCKS.with(|r| r.borrow_mut().clear());
     state::with_mut(|s| {
         s.unconfirmed_utxs.clear();
         s.unconfirmed_utxos.clear();
+        s.processed_blocks.clear();
         s.processed_height = s.confirmed_height;
         s.processed_blockhash = s.confirmed_blockhash;
         s.tip_height = s.processed_height;
@@ -427,22 +429,20 @@ pub fn confirm_utxos() -> Result<bool, String> {
         let confirmed_height = s
             .processed_height
             .saturating_sub(s.min_confirmations as u64);
-        if s.confirmed_height >= confirmed_height {
+        if confirmed_height < s.start_height || confirmed_height <= s.confirmed_height {
             return Ok(UNPROCESSED_BLOCKS.with(|r| !r.borrow().is_empty()));
         }
 
-        let confirmed_blockhash = PROCESSED_BLOCKS.with(|r| {
-            let mut q = r.borrow_mut();
-            while let Some((height, hash)) = q.pop_front() {
-                if height == confirmed_height {
-                    return Ok(hash);
-                }
+        let mut confirmed_blockhash = None;
+        while let Some((height, hash)) = s.processed_blocks.pop_front() {
+            if height == confirmed_height {
+                confirmed_blockhash = Some(hash);
+                break;
             }
-            Err(format!(
-                "no processed blockhash at height {}",
-                confirmed_height
-            ))
-        })?;
+        }
+
+        let confirmed_blockhash = confirmed_blockhash
+            .ok_or_else(|| format!("no processed blockhash at height {}", confirmed_height))?;
 
         UT.with(|utr| {
             XO.with(|xor| {
@@ -454,7 +454,7 @@ pub fn confirm_utxos() -> Result<bool, String> {
                     confirmed_height,
                 )?;
                 s.confirmed_height = confirmed_height;
-                s.confirmed_blockhash = *confirmed_blockhash;
+                s.confirmed_blockhash = confirmed_blockhash;
                 Ok(UNPROCESSED_BLOCKS.with(|r| !r.borrow().is_empty()))
             })
         })

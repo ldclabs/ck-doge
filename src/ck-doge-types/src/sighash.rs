@@ -203,7 +203,6 @@ pub fn decode_secretkey_wif(sk: &str) -> Result<SecretKey, String> {
             if data[0] != chain.pkey_prefix {
                 return Err("wrong key prefix".to_string());
             }
-            println!("data: {:?}", data.len());
             let key = SecretKey::from_slice(&data[1..33]).map_err(err_string)?;
             Ok(key)
         }

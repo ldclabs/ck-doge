@@ -13,7 +13,7 @@ dfx start
 
 # deploy the canister
 dfx deploy ck-doge-canister --argument "
-  (record {
+  (opt record {
     chain = 32;
     min_confirmations = 42;
     ecdsa_key_name = \"dfx_test_key\";
@@ -34,7 +34,7 @@ dfx canister call ck-doge-canister admin_set_agent '
 '
 
 # start sync jobs to sync Dogecoin blocks and process transactions
-dfx canister call ck-doge-canister admin_restart_sync_job '()'
+dfx canister call ck-doge-canister admin_restart_syncing '()'
 ```
 
 ## License
