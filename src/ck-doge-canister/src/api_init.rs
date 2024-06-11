@@ -43,9 +43,9 @@ fn post_upgrade() {
     store::state::load();
 
     store::syncing::with_mut(|s| {
-        ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+        s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
             ic_cdk::spawn(syncing::fetch_block())
-        });
+        }));
 
         s.refresh_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(
             Duration::from_secs(syncing::REFRESH_PROXY_TOKEN_INTERVAL),

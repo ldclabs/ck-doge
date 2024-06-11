@@ -34,7 +34,7 @@ dfx canister call ck-doge-canister admin_set_agent '
 '
 
 # start sync jobs to sync Dogecoin blocks and process transactions
-dfx canister call ck-doge-canister admin_restart_syncing '()'
+dfx canister call ck-doge-canister admin_restart_syncing '(false)'
 ```
 
 ## License

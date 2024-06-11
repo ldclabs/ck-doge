@@ -50,32 +50,46 @@ async fn admin_set_agent(mut arg: canister::RPCAgent) -> Result<(), String> {
 }
 
 #[ic_cdk::update(guard = "is_controller_or_manager")]
-async fn admin_restart_syncing() -> Result<(), String> {
+async fn admin_restart_syncing(force: bool) -> Result<(), String> {
     store::state::with_mut(|s| s.last_errors.clear());
-    match store::syncing::with_mut(|s| s.status) {
-        0 | -1 => {
-            ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-                ic_cdk::spawn(syncing::fetch_block())
-            });
+    store::syncing::with_mut(|s| {
+        match s.status {
+            0 | -1 => {
+                s.status = 0;
+                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+                    ic_cdk::spawn(syncing::fetch_block())
+                }));
+            }
+            -2 => {
+                store::clear_for_restart_process_block();
+                s.status = 0;
+                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+                    ic_cdk::spawn(syncing::fetch_block())
+                }));
+            }
+            -3 => {
+                store::clear_for_restart_confirm_utxos();
+                s.status = 0;
+                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+                    ic_cdk::spawn(syncing::fetch_block())
+                }));
+            }
+            _ if force => {
+                if let Some(timer) = s.timer {
+                    ic_cdk_timers::clear_timer(timer);
+                }
+                s.status = 0;
+                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+                    ic_cdk::spawn(syncing::fetch_block())
+                }));
+            }
+            status => {
+                return Err(format!(
+                    "sync job is already running, currently at {}",
+                    status
+                ));
+            }
         }
-        -2 => {
-            store::clear_for_restart_process_block();
-            ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-                ic_cdk::spawn(syncing::fetch_block())
-            });
-        }
-        -3 => {
-            store::clear_for_restart_confirm_utxos();
-            ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-                ic_cdk::spawn(syncing::fetch_block())
-            });
-        }
-        status => {
-            return Err(format!(
-                "sync job is already running, currently at {}",
-                status
-            ));
-        }
-    }
-    Ok(())
+        Ok(())
+    })
 }

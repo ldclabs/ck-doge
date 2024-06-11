@@ -65,7 +65,7 @@ pub struct State {
     pub rpc_agent: RPCAgent,
 
     pub unconfirmed_utxs: BTreeMap<[u8; 32], UnspentTxState>,
-    pub unconfirmed_utxos: BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    pub unconfirmed_utxos: BTreeMap<[u8; 21], (UtxoStates, SpentUtxos)>,
     processed_blocks: VecDeque<(u64, [u8; 32])>,
 }
 
@@ -127,18 +127,22 @@ impl Storable for UnspentTxState {
 
 // address -> UnspentOutput
 #[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UtxoState(pub u64, pub u64, pub [u8; 32], pub u32, pub u64);
+pub struct UtxoState(pub u64, pub [u8; 32], pub u32, pub u64);
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct UtxoStates(BTreeSet<UtxoState>);
 
+// UtxoState -> spent height
+#[derive(Clone, Default, Deserialize, Serialize)]
+pub struct SpentUtxos(BTreeMap<UtxoState, u64>);
+
 impl From<UtxoState> for Utxo {
     fn from(uts: UtxoState) -> Self {
         Utxo {
-            height: uts.0, // uts.1: spent height
-            txid: Txid(uts.2),
-            vout: uts.3,
-            value: uts.4,
+            height: uts.0,
+            txid: Txid(uts.1),
+            vout: uts.2,
+            value: uts.3,
         }
     }
 }
@@ -170,6 +174,7 @@ const XO_MEMORY_ID: MemoryId = MemoryId::new(2);
 #[derive(Default)]
 pub struct SyncingState {
     pub status: i8, // 0: not running, > 0: running, < 0: stop because of error
+    pub timer: Option<ic_cdk_timers::TimerId>,
     pub refresh_proxy_token_timer: Option<ic_cdk_timers::TimerId>,
 }
 
@@ -345,8 +350,11 @@ pub fn append_block(height: u64, hash: BlockHash, block: Block) -> Result<(), St
 pub fn clear_for_restart_process_block() {
     UNPROCESSED_BLOCKS.with(|r| r.borrow_mut().clear());
     state::with_mut(|s| {
-        s.tip_height = s.processed_height;
-        s.tip_blockhash = s.processed_blockhash;
+        // reset the tip to the last processed block
+        if s.processed_height > 0 {
+            s.tip_height = s.processed_height;
+            s.tip_blockhash = s.processed_blockhash;
+        }
     });
 }
 
@@ -418,8 +426,11 @@ pub fn clear_for_restart_confirm_utxos() {
         s.processed_blocks.clear();
         s.processed_height = s.confirmed_height;
         s.processed_blockhash = s.confirmed_blockhash;
-        s.tip_height = s.processed_height;
-        s.tip_blockhash = s.processed_blockhash;
+        // reset the tip to the last processed block
+        if s.processed_height > 0 {
+            s.tip_height = s.processed_height;
+            s.tip_blockhash = s.processed_blockhash;
+        }
     });
 }
 
@@ -472,13 +483,13 @@ pub fn get_balance(addr: &[u8; 21]) -> u64 {
     let mut res = XO.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     state::with(|s| {
         if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
-            for ts in sts.0.iter() {
-                res.remove(&UtxoState(ts.0, 0, ts.2, ts.3, ts.4));
+            for tx in sts.0.keys() {
+                res.remove(tx);
             }
             res.append(&mut uts.0.clone());
         }
     });
-    res.into_iter().map(|v| v.4).sum()
+    res.into_iter().map(|v| v.3).sum()
 }
 
 pub fn list_utxos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
@@ -486,8 +497,8 @@ pub fn list_utxos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
     if !confirmed {
         state::with(|s| {
             if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
-                for ts in sts.0.iter() {
-                    res.remove(&UtxoState(ts.0, 0, ts.2, ts.3, ts.4));
+                for tx in sts.0.keys() {
+                    res.remove(tx);
                 }
                 res.append(&mut uts.0.clone());
             }
@@ -499,7 +510,7 @@ pub fn list_utxos(addr: &[u8; 21], take: usize, confirmed: bool) -> Vec<Utxo> {
 
 fn process_spent_tx(
     unconfirmed_utxs: &mut BTreeMap<[u8; 32], UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, SpentUtxos)>,
     utm: &StableBTreeMap<[u8; 32], UnspentTxState, Memory>,
     chain: &ChainParams,
     tx: &transaction::Transaction,
@@ -525,30 +536,18 @@ fn process_spent_tx(
 
             // move spent utxo
             if let Some(addr) = addr {
+                let utxo = UtxoState(utx.0, previd, txin.prevout.vout, txout.value);
                 match unconfirmed_utxos.get_mut(&addr.0) {
                     Some((uts, sts)) => {
-                        uts.0
-                            .remove(&UtxoState(utx.0, 0, previd, txin.prevout.vout, txout.value));
-                        sts.0.insert(UtxoState(
-                            utx.0,
-                            height,
-                            previd,
-                            txin.prevout.vout,
-                            txout.value,
-                        ));
+                        uts.0.remove(&utxo);
+                        sts.0.insert(utxo, height);
                     }
                     None => {
                         unconfirmed_utxos.insert(
                             addr.0,
                             (
                                 UtxoStates(BTreeSet::new()),
-                                UtxoStates(BTreeSet::from([UtxoState(
-                                    utx.0,
-                                    height,
-                                    previd,
-                                    txin.prevout.vout,
-                                    txout.value,
-                                )])),
+                                SpentUtxos(BTreeMap::from([(utxo, height)])),
                             ),
                         );
                     }
@@ -567,7 +566,7 @@ fn process_spent_tx(
 
 fn add_unspent_txouts(
     unconfirmed_utxs: &mut BTreeMap<[u8; 32], UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, SpentUtxos)>,
     chain: &ChainParams,
     tx: &transaction::Transaction,
     txid: Txid,
@@ -589,7 +588,7 @@ fn add_unspent_txouts(
         let (_, addr) = script::classify_script(txout.script_pubkey.as_bytes(), chain);
 
         if let Some(addr) = addr {
-            let utxo = UtxoState(height, 0, txid.0, vout as u32, txout.value);
+            let utxo = UtxoState(height, txid.0, vout as u32, txout.value);
             match unconfirmed_utxos.get_mut(&addr.0) {
                 Some((uts, _sts)) => {
                     uts.0.insert(utxo);
@@ -599,7 +598,7 @@ fn add_unspent_txouts(
                         addr.0,
                         (
                             UtxoStates(BTreeSet::from([utxo])),
-                            UtxoStates(BTreeSet::new()),
+                            SpentUtxos(BTreeMap::new()),
                         ),
                     );
                 }
@@ -612,7 +611,7 @@ fn add_unspent_txouts(
 
 fn flush_confirmed_utxos(
     unconfirmed_utxs: &mut BTreeMap<[u8; 32], UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, UtxoStates)>,
+    unconfirmed_utxos: &mut BTreeMap<[u8; 21], (UtxoStates, SpentUtxos)>,
     utm: &mut StableBTreeMap<[u8; 32], UnspentTxState, Memory>,
     xom: &mut StableBTreeMap<[u8; 21], UtxoStates, Memory>,
     confirmed_height: u64,
@@ -664,9 +663,9 @@ fn flush_confirmed_utxos(
             });
 
             let mut confirmed_stxos: BTreeSet<UtxoState> = BTreeSet::new();
-            sts.0.retain(|ts| {
-                if ts.1 <= confirmed_height {
-                    confirmed_stxos.insert(ts.clone());
+            sts.0.retain(|tx, height| {
+                if *height <= confirmed_height {
+                    confirmed_stxos.insert(tx.clone());
                     false
                 } else {
                     true
@@ -676,8 +675,7 @@ fn flush_confirmed_utxos(
             if !confirmed_utxos.is_empty() || !confirmed_stxos.is_empty() {
                 match xom.get(addr) {
                     Some(mut uts) => {
-                        for mut ts in confirmed_stxos {
-                            ts.1 = 0;
+                        for ts in confirmed_stxos {
                             uts.0.remove(&ts);
                         }
                         uts.0.append(&mut confirmed_utxos);

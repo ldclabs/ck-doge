@@ -52,19 +52,27 @@ pub async fn fetch_block() {
 
     match res {
         Err(FetchBlockError::Other(err)) => {
-            store::syncing::with_mut(|s| s.status = -1);
             store::state::with_mut(|s| s.append_error(err.clone()));
+            store::syncing::with_mut(|s| s.status = -1);
             ic_cdk::trap(&err);
         }
         Err(FetchBlockError::ShouldWait(err)) => {
             store::state::with_mut(|s| s.append_error(err.clone()));
-            ic_cdk_timers::set_timer(Duration::from_secs(FETCH_BLOCK_AFTER), || {
-                ic_cdk::spawn(fetch_block())
+            store::syncing::with_mut(|s| {
+                s.timer = Some(ic_cdk_timers::set_timer(
+                    Duration::from_secs(FETCH_BLOCK_AFTER),
+                    || ic_cdk::spawn(fetch_block()),
+                ));
             });
         }
         Ok(_) => {
             store::state::with_mut(|s| s.last_errors.clear());
-            ic_cdk_timers::set_timer(Duration::from_secs(0), process_block);
+            store::syncing::with_mut(|s| {
+                s.timer = Some(ic_cdk_timers::set_timer(
+                    Duration::from_secs(0),
+                    process_block,
+                ));
+            });
         }
     }
 }
@@ -78,11 +86,16 @@ fn process_block() {
             ic_cdk::trap(&err);
         }
         Ok(res) => {
-            if res {
-                ic_cdk_timers::set_timer(Duration::from_secs(0), confirm_utxos);
-            } else {
-                ic_cdk_timers::set_timer(Duration::from_secs(0), || ic_cdk::spawn(fetch_block()));
-            }
+            store::syncing::with_mut(|s| {
+                s.timer = Some(if res {
+                    ic_cdk_timers::set_timer(Duration::from_secs(0), confirm_utxos)
+                } else {
+                    ic_cdk_timers::set_timer(
+                        Duration::from_secs(0),
+                        || ic_cdk::spawn(fetch_block()),
+                    )
+                });
+            });
         }
     }
 }
@@ -96,11 +109,16 @@ fn confirm_utxos() {
             ic_cdk::trap(&err);
         }
         Ok(res) => {
-            if res {
-                ic_cdk_timers::set_timer(Duration::from_secs(0), process_block);
-            } else {
-                ic_cdk_timers::set_timer(Duration::from_secs(0), || ic_cdk::spawn(fetch_block()));
-            }
+            store::syncing::with_mut(|s| {
+                s.timer = Some(if res {
+                    ic_cdk_timers::set_timer(Duration::from_secs(0), process_block)
+                } else {
+                    ic_cdk_timers::set_timer(
+                        Duration::from_secs(0),
+                        || ic_cdk::spawn(fetch_block()),
+                    )
+                });
+            });
         }
     }
 }

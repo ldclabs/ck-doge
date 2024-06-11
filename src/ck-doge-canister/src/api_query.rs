@@ -32,6 +32,7 @@ pub struct State {
     pub rpc_proxy_public_key: Option<String>,
     pub rpc_agent: Option<RPCAgent>,
     pub ecdsa_key_name: Option<String>,
+    pub syncing_status: Option<i8>,
 }
 
 #[ic_cdk::query]
@@ -61,6 +62,9 @@ fn get_state() -> Result<State, ()> {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
             res.rpc_proxy_public_key = Some(s.rpc_proxy_public_key.clone());
             res.rpc_agent = Some(s.rpc_agent.clone());
+            store::syncing::with(|s| {
+                res.syncing_status = Some(s.status);
+            });
         }
         res
     }))
