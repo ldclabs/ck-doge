@@ -145,7 +145,7 @@ pub struct SendSignedTransactionOutput {
 pub struct CreateSignedTransactionInput {
     pub address: String,
     pub amount: u64,
-    pub fee: u64,
+    pub fee_rate: u64, // units per vByte, should >= 1000
     pub from_subaccount: Option<[u8; 32]>,
 }
 

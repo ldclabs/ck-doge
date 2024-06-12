@@ -1,8 +1,8 @@
 type BlockRef = record { height : nat64; hash : text };
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 type CreateSignedTransactionInput = record {
-  fee : nat64;
   from_subaccount : opt blob;
+  fee_rate : nat64;
   address : text;
   amount : nat64;
 };

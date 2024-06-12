@@ -4,23 +4,11 @@ pub const CENT: u64 = 1_000_000;
 // 0.01 DOGE per kilobyte transaction fee
 // 0.01 DOGE dust limit (discard threshold)
 // 0.001 DOGE replace-by-fee increments
-pub const FEE: u64 = 1_000_000;
+pub const MIN_FEE: u64 = 1_000_000;
+pub const MIN_FEE_RATE: u64 = 1_000; // units per vByte
 pub const DUST_LIMIT: u64 = 1_000_000;
 
-pub fn fee_by_size(size: usize) -> u64 {
-    (((size as u64 * FEE) as f64 / 1024f64).ceil() as u64).max(FEE)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fee_by_size() {
-        assert_eq!(fee_by_size(0), FEE);
-        assert_eq!(fee_by_size(10), FEE);
-        assert_eq!(fee_by_size(1000), FEE);
-        assert_eq!(fee_by_size(1034), 1009766);
-        assert_eq!(fee_by_size(2048), FEE * 2);
-    }
+pub fn fee_by_size(bytes: u64, fee_rate: u64) -> u64 {
+    let fee_rate = fee_rate.max(MIN_FEE_RATE);
+    (bytes * fee_rate).max(MIN_FEE)
 }

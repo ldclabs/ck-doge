@@ -1,4 +1,4 @@
-type BurnInput = record { address : text; amount : nat64 };
+type BurnInput = record { fee_rate : nat64; address : text; amount : nat64 };
 type BurnOutput = record {
   tip_height : nat64;
   txid : blob;
@@ -27,7 +27,7 @@ type State = record {
   ecdsa_key_name : opt text;
   managers : vec principal;
   chain : text;
-  utxos_retry_burning_queue : vec record { nat64; blob; nat64 };
+  utxos_retry_burning_queue : vec record { nat64; blob; nat64; nat64; nat8 };
   collected_utxos : nat64;
   tokens_burned : nat64;
   accounts : nat64;

@@ -51,14 +51,13 @@ async fn create_signed_transaction(
                 script_pubkey: receiver.to_script(chain),
             },
             TxOut {
-                value: total_value.saturating_sub(input.amount + input.fee),
+                value: total_value.saturating_sub(input.amount),
                 script_pubkey: script_pubkey.clone(),
             },
         ],
     };
 
-    let size = send_tx.estimate_size();
-    let fee = amount::fee_by_size(size).max(input.fee);
+    let fee = amount::fee_by_size(send_tx.estimate_size() as u64, input.fee_rate);
     if total_value < input.amount + fee {
         return Err(format!(
             "insufficient balance, expected: {}, got {}",

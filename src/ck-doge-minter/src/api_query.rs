@@ -23,7 +23,7 @@ pub struct State {
     pub managers: BTreeSet<Principal>,
     // manager info
     pub ecdsa_key_name: Option<String>,
-    pub utxos_retry_burning_queue: Vec<(u64, canister::Address, u64)>,
+    pub utxos_retry_burning_queue: Vec<(u64, canister::Address, u64, u64, u8)>,
 }
 
 #[ic_cdk::query]

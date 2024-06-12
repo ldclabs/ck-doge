@@ -25,6 +25,7 @@ pub struct MintOutput {
 pub struct BurnInput {
     pub address: String,
     pub amount: u64,
+    pub fee_rate: u64, // units per vByte, should >= 1000
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]

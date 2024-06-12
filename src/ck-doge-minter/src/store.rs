@@ -57,8 +57,9 @@ pub struct State {
 
     pub managers: BTreeSet<Principal>,
 
+    // (block_index, receiver, amount, fee_rate, retry)
     #[serde(default)]
-    pub utxos_retry_burning_queue: VecDeque<(u64, canister::Address, u64)>,
+    pub utxos_retry_burning_queue: VecDeque<(u64, canister::Address, u64, u64, u8)>,
 }
 
 impl State {
@@ -327,6 +328,9 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
             }
         })
         .collect::<Vec<_>>();
+    if utxos.is_empty() {
+        return Err("no utxos found".to_string());
+    }
 
     let minted_at = ic_cdk::api::time() / MILLISECONDS;
     let mut total_amount = 0;
@@ -376,6 +380,7 @@ pub async fn burn_ckdoge(
     caller: Principal,
     address: String,
     amount: u64,
+    fee_rate: u64,
 ) -> Result<canister::SendSignedTransactionOutput, String> {
     if amount < DUST_LIMIT * 10 {
         return Err("amount is too small".to_string());
@@ -445,12 +450,12 @@ pub async fn burn_ckdoge(
         }
     });
 
-    match burn_utxos(blk, receiver.clone(), amount, utxos).await {
+    match burn_utxos(blk, receiver.clone(), amount, fee_rate, utxos).await {
         Ok(res) => Ok(res),
         Err(err) => {
             state::with_mut(|s| {
                 s.utxos_retry_burning_queue
-                    .push_back((blk, receiver.into(), amount));
+                    .push_back((blk, receiver.into(), amount, fee_rate, 0));
             });
 
             // retry burn utxos after 30 seconds
@@ -465,7 +470,7 @@ pub async fn burn_ckdoge(
 
 // we can retry burn utxos if it failed in the previous burn_ckdoge call
 pub async fn retry_burn_utxos() {
-    if let Some((blk, receiver, amount)) =
+    if let Some((blk, receiver, amount, fee_rate, retry)) =
         state::with_mut(|s| s.utxos_retry_burning_queue.pop_front())
     {
         ic_cdk::print(format!(
@@ -483,13 +488,14 @@ pub async fn retry_burn_utxos() {
             utxos
         });
 
-        if burn_utxos(blk, receiver.clone().into(), amount, utxos)
+        if burn_utxos(blk, receiver.clone().into(), amount, fee_rate, utxos)
             .await
             .is_err()
+            && retry < 3
         {
             state::with_mut(|s| {
                 s.utxos_retry_burning_queue
-                    .push_back((blk, receiver, amount));
+                    .push_back((blk, receiver, amount, fee_rate, retry + 1));
             });
         }
 
@@ -551,6 +557,7 @@ async fn burn_utxos(
     block_index: u64,
     receiver: script::Address,
     amount: u64,
+    fee_rate: u64,
     utxos: Vec<(Utxo, Principal)>,
 ) -> Result<canister::SendSignedTransactionOutput, String> {
     let (chain_params, key_name, ecdsa_public_key) = state::with(|s| {
@@ -590,7 +597,7 @@ async fn burn_utxos(
         ],
     };
 
-    let fee = fee_by_size(send_tx.estimate_size());
+    let fee = fee_by_size(send_tx.estimate_size() as u64, fee_rate);
     send_tx.output[0].value = amount.saturating_sub(fee);
     send_tx.output[1].value = total.saturating_sub(amount);
     if send_tx.output[1].value <= DUST_LIMIT {

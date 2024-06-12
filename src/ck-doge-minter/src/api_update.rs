@@ -11,7 +11,8 @@ async fn mint_ckdoge() -> Result<types::MintOutput, String> {
 
 #[ic_cdk::update(guard = "is_authenticated")]
 async fn burn_ckdoge(args: types::BurnInput) -> Result<types::BurnOutput, String> {
-    let res = store::burn_ckdoge(ic_cdk::caller(), args.address, args.amount).await?;
+    let res =
+        store::burn_ckdoge(ic_cdk::caller(), args.address, args.amount, args.fee_rate).await?;
 
     Ok(types::BurnOutput {
         txid: res.txid,
