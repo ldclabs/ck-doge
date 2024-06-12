@@ -396,7 +396,6 @@ pub async fn burn_ckdoge(
     if !receiver.is_p2pkh(chain_params) {
         return Err("invalid p2pkh address".to_string());
     }
-    let minter: script::Address = get_address(&minter_account())?.into();
 
     let balance = ledger.balance_of(ckdoge_acc).await?;
     if amount > balance {
@@ -425,7 +424,7 @@ pub async fn burn_ckdoge(
     if total < amount {
         let size = utxos.len();
         return Err(format!(
-            "The latest batch of UTXOs ({size}) has a total balance of {total}. This withdrawal cannot exceed the limit."
+            "The latest batch of {size} UTXOs has a total balance of {total}. This withdrawal cannot exceed the limit."
         ));
     }
 
@@ -437,6 +436,10 @@ pub async fn burn_ckdoge(
         .burn(amount, ckdoge_acc, Memo(ByteBuf::from(memo)))
         .await?;
 
+    state::with_mut(|s| {
+        s.tokens_burned = s.tokens_burned.saturating_add(amount);
+    });
+
     COLLECTED_UTXOS.with(|r| {
         let mut m = r.borrow_mut();
         // mark utxos as used
@@ -444,6 +447,9 @@ pub async fn burn_ckdoge(
             m.insert(utxo.0.clone(), (utxo.1, blk, 0));
         }
     });
+
+    let mut kc = KeysCache::new(&ecdsa_public_key, chain_params);
+    let minter = kc.get_or_set(ic_cdk::id())?;
 
     let mut send_tx = Transaction {
         version: Transaction::CURRENT_VERSION,
@@ -464,7 +470,7 @@ pub async fn burn_ckdoge(
             },
             TxOut {
                 value: total.saturating_sub(amount),
-                script_pubkey: minter.to_script(chain_params),
+                script_pubkey: minter.script_pubkey.clone(),
             },
         ],
     };
@@ -478,12 +484,9 @@ pub async fn burn_ckdoge(
 
     let mut sighasher = SighashCache::new(&mut send_tx);
     for (i, utxo) in utxos.iter().enumerate() {
-        let key_path = account_path(&user_account(&utxo.1));
-        let pk = derive_public_key(&ecdsa_public_key, key_path.clone());
-        let addr = script::p2pkh_address(&pk.public_key, chain_params)?;
-        let hash =
-            sighasher.signature_hash(i, &addr.to_script(chain_params), EcdsaSighashType::All)?;
-        let sig = sign_with(&key_name, key_path, *hash).await?;
+        let acc = kc.get_or_set(utxo.1)?;
+        let hash = sighasher.signature_hash(i, &acc.script_pubkey, EcdsaSighashType::All)?;
+        let sig = sign_with(&key_name, acc.key_path.clone(), *hash).await?;
         let signature = Signature::from_compact(&sig).map_err(err_string)?;
         sighasher
             .set_input_script(
@@ -492,7 +495,7 @@ pub async fn burn_ckdoge(
                     signature,
                     sighash_type: EcdsaSighashType::All,
                 },
-                &PublicKey::from_slice(&pk.public_key).map_err(err_string)?,
+                &acc.public_key,
             )
             .map_err(err_string)?;
     }
@@ -520,8 +523,8 @@ pub async fn burn_ckdoge(
 }
 
 pub async fn collect_and_clear_utxos() -> Result<u64, String> {
-    let acc = minter_account();
-    let addr = get_address(&acc)?;
+    let minter = ic_cdk::id();
+    let addr = get_address(&user_account(&minter))?;
 
     let chain = state::get_chain()?;
     let res = chain.list_utxos(&addr).await?;
@@ -537,7 +540,7 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
             let utxo = Utxo(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
             if !m.contains_key(&utxo) {
                 total += utxo.3;
-                m.insert(utxo, (acc.owner, 0, 0));
+                m.insert(utxo, (minter, 0, 0));
             }
         }
 
@@ -563,4 +566,46 @@ pub fn list_minted_utxos(caller: Principal) -> Vec<types::MintedUtxo> {
             .get(&caller)
             .map_or_else(Vec::new, |utxos| utxos.into())
     })
+}
+
+struct KeyInfo {
+    key_path: Vec<Vec<u8>>,
+    public_key: PublicKey,
+    script_pubkey: script::ScriptBuf,
+}
+
+struct KeysCache<'a> {
+    ecdsa_public_key: &'a ECDSAPublicKey,
+    chain_params: &'a ChainParams,
+    keys: BTreeMap<Principal, KeyInfo>,
+}
+
+impl<'a> KeysCache<'a> {
+    fn new(ecdsa_public_key: &'a ECDSAPublicKey, chain_params: &'a ChainParams) -> Self {
+        Self {
+            ecdsa_public_key,
+            chain_params,
+            keys: BTreeMap::new(),
+        }
+    }
+
+    fn get_or_set(&mut self, caller: Principal) -> Result<&KeyInfo, String> {
+        let ok = self.keys.contains_key(&caller);
+        if !ok {
+            let account = user_account(&caller);
+            let key_path = account_path(&account);
+            let pk = derive_public_key(self.ecdsa_public_key, key_path.clone());
+            let address = script::p2pkh_address(&pk.public_key, self.chain_params)?;
+            let public_key = PublicKey::from_slice(&pk.public_key).map_err(err_string)?;
+            let script_pubkey = address.to_script(self.chain_params);
+            let info = KeyInfo {
+                key_path,
+                public_key,
+                script_pubkey,
+            };
+            self.keys.insert(caller, info);
+        }
+
+        Ok(self.keys.get(&caller).unwrap())
+    }
 }

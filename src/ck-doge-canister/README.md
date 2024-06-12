@@ -27,7 +27,7 @@ dfx canister call ck-doge-canister get_state '()'
 # upgrade
 dfx deploy ck-doge-canister --argument "(opt variant {Upgrade =
   record {
-    min_confirmations = opt 12;
+    min_confirmations = opt 6;
   }
 })"
 
