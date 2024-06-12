@@ -1,6 +1,6 @@
 use bitcoin::hashes::sha256d;
 use candid::{CandidType, Principal};
-use ck_doge_types::canister::*;
+use ck_doge_types::canister::{*};
 use std::{collections::BTreeSet, str::FromStr};
 
 use crate::{is_authenticated, is_controller_or_manager, store, Account};
@@ -106,18 +106,28 @@ fn get_utx_b(txid: [u8; 32]) -> Option<UnspentTx> {
 }
 
 #[ic_cdk::query]
-fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<Vec<Utxo>, String> {
+fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
     let address = Address::from_str(&addr)?;
-    Ok(store::list_utxos(
-        &address.0,
-        take.max(10).min(10000) as usize,
-        confirmed,
-    ))
+    let utxos = store::list_utxos(&address.0, take.max(10).min(10000) as usize, confirmed);
+    store::state::with(|s| {
+        Ok(UtxosOutput {
+            utxos,
+            confirmed_height: s.confirmed_height,
+            tip_height: s.tip_height,
+        })
+    })
 }
 
 #[ic_cdk::query]
-fn list_utxos_b(address: [u8; 21], take: u16, confirmed: bool) -> Vec<Utxo> {
-    store::list_utxos(&address, take.max(10).min(10000) as usize, confirmed)
+fn list_utxos_b(address: [u8; 21], take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
+    let utxos = store::list_utxos(&address, take.max(10).min(10000) as usize, confirmed);
+    store::state::with(|s| {
+        Ok(UtxosOutput {
+            utxos,
+            confirmed_height: s.confirmed_height,
+            tip_height: s.tip_height,
+        })
+    })
 }
 
 #[ic_cdk::query]

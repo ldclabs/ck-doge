@@ -37,7 +37,7 @@ impl JsonRPCAgent for &RPCAgent {
             },
             HttpHeader {
                 name: "idempotency-key".to_string(),
-                value: idempotency_key,
+                value: idempotency_key.clone(),
             },
         ];
 
@@ -73,15 +73,16 @@ impl JsonRPCAgent for &RPCAgent {
                     Ok(bytes::Bytes::from(res.body))
                 } else {
                     Err(format!(
-                        "Failed to send request. status: {}, body: {}, url: {}",
+                        "failed to request url: {}, idempotency-key: {}, status: {}, body: {}",
+                        self.endpoint,
+                        idempotency_key,
                         res.status,
                         String::from_utf8(res.body).unwrap_or_default(),
-                        self.endpoint,
                     ))
                 }
             }
             Err((code, message)) => Err(format!(
-                "The http_request resulted into error. code: {code:?}, error: {message}"
+                "the http_request resulted into error. code: {code:?}, error: {message}"
             )),
         }
     }

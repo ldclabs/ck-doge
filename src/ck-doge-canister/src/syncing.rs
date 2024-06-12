@@ -29,6 +29,7 @@ enum FetchBlockError {
 }
 
 pub async fn fetch_block() {
+    store::state::with_mut(|s| s.last_errors.clear());
     store::syncing::with_mut(|s| s.status = 1);
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();

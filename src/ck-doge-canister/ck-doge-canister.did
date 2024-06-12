@@ -1,11 +1,17 @@
 type BlockRef = record { height : nat64; hash : text };
+type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 type CreateSignedTransactionInput = record {
   fee : nat64;
+  from_subaccount : opt blob;
   address : text;
   amount : nat64;
 };
-type CreateSignedTransactionOutput = record { tx : blob; instructions : nat64 };
-type InitArg = record {
+type CreateSignedTransactionOutput = record {
+  tx : blob;
+  tip_height : nat64;
+  instructions : nat64;
+};
+type InitArgs = record {
   ecdsa_key_name : text;
   chain : nat8;
   prev_start_height : nat64;
@@ -26,10 +32,14 @@ type Result_3 = variant { Ok : nat64; Err : text };
 type Result_4 = variant { Ok : State; Err };
 type Result_5 = variant { Ok : BlockRef; Err : text };
 type Result_6 = variant { Ok : UnspentTx; Err : text };
-type Result_7 = variant { Ok : vec Utxo; Err : text };
+type Result_7 = variant { Ok : UtxosOutput; Err : text };
 type Result_8 = variant { Ok : SendSignedTransactionOutput; Err : text };
 type SendSignedTransactionInput = record { tx : blob };
-type SendSignedTransactionOutput = record { txid : blob; instructions : nat64 };
+type SendSignedTransactionOutput = record {
+  tip_height : nat64;
+  txid : blob;
+  instructions : nat64;
+};
 type State = record {
   start_height : nat64;
   processed_height : nat64;
@@ -57,8 +67,14 @@ type UnspentTx = record {
   output : vec blob;
   spent : vec opt blob;
 };
+type UpgradeArgs = record { min_confirmations : opt nat32 };
 type Utxo = record { height : nat64; value : nat64; txid : blob; vout : nat32 };
-service : (opt InitArg) -> {
+type UtxosOutput = record {
+  tip_height : nat64;
+  confirmed_height : nat64;
+  utxos : vec Utxo;
+};
+service : (opt ChainArgs) -> {
   admin_restart_syncing : (bool) -> (Result);
   admin_set_agent : (RPCAgent) -> (Result);
   admin_set_managers : (vec principal) -> (Result);
@@ -72,7 +88,7 @@ service : (opt InitArg) -> {
   get_utx : (text) -> (Result_6) query;
   get_utx_b : (blob) -> (opt UnspentTx) query;
   list_utxos : (text, nat16, bool) -> (Result_7) query;
-  list_utxos_b : (blob, nat16, bool) -> (vec Utxo) query;
+  list_utxos_b : (blob, nat16, bool) -> (Result_7) query;
   send_signed_transaction : (SendSignedTransactionInput) -> (Result_8);
   validate_admin_set_managers : (vec principal) -> (Result);
 }

@@ -1,1 +1,52 @@
-service : { api_version : () -> (nat16) query }
+type BurnInput = record { address : text; amount : nat64 };
+type BurnOutput = record {
+  tip_height : nat64;
+  txid : blob;
+  instructions : nat64;
+};
+type InitArgs = record {
+  ecdsa_key_name : text;
+  chain : nat8;
+  ledger_canister : opt principal;
+  chain_canister : opt principal;
+};
+type MintOutput = record { instructions : nat64; amount : nat64 };
+type MintedUtxo = record {
+  block_index : nat64;
+  utxo : Utxo;
+  minted_at : nat64;
+};
+type MinterArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : BurnOutput; Err : text };
+type Result_2 = variant { Ok : text; Err : text };
+type Result_3 = variant { Ok : State; Err };
+type Result_4 = variant { Ok : vec MintedUtxo; Err : text };
+type Result_5 = variant { Ok : MintOutput; Err : text };
+type State = record {
+  ecdsa_key_name : opt text;
+  managers : vec principal;
+  chain : text;
+  collected_utxos : nat64;
+  tokens_burned : nat64;
+  accounts : nat64;
+  ledger_canister : opt principal;
+  burned_utxos : nat64;
+  chain_canister : opt principal;
+  tokens_minted : nat64;
+};
+type UpgradeArgs = record {
+  ledger_canister : opt principal;
+  chain_canister : opt principal;
+};
+type Utxo = record { height : nat64; value : nat64; txid : blob; vout : nat32 };
+service : (opt MinterArgs) -> {
+  admin_set_managers : (vec principal) -> (Result);
+  api_version : () -> (nat16) query;
+  burn_ckdoge : (BurnInput) -> (Result_1);
+  get_address : () -> (Result_2) query;
+  get_state : () -> (Result_3) query;
+  list_minted_utxos : (opt principal) -> (Result_4) query;
+  mint_ckdoge : () -> (Result_5);
+  validate_admin_set_managers : (vec principal) -> (Result);
+}

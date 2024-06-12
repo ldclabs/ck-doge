@@ -16,6 +16,7 @@ async fn send_signed_transaction(
     let txid = DogecoinRPC::send_transaction(&agent, txid.to_string(), &tx).await?;
     Ok(canister::SendSignedTransactionOutput {
         txid: txid.into(),
+        tip_height: store::state::with(|s| s.tip_height),
         instructions: ic_cdk::api::performance_counter(1),
     })
 }
@@ -24,15 +25,17 @@ async fn send_signed_transaction(
 async fn create_signed_transaction(
     input: canister::CreateSignedTransactionInput,
 ) -> Result<canister::CreateSignedTransactionOutput, String> {
-    let addr = script::Address::from_str(&input.address)?;
-    let account = Account {
+    let receiver = script::Address::from_str(&input.address)?;
+    let sender = Account {
         owner: ic_cdk::caller(),
-        subaccount: None,
+        subaccount: input.from_subaccount,
     };
+    let sender_key_path = ecdsa::account_path(&sender);
+
     let (chain, key_name) = store::state::with(|s| (s.chain_params(), s.ecdsa_key_name.clone()));
-    let mykey = store::get_public_key(&account)?;
-    let myaddr = script::p2pkh_address(&mykey.public_key, chain)?;
-    let pubkey = PublicKey::from_slice(&mykey.public_key).map_err(err_string)?;
+    let sender_key = store::get_public_key(sender_key_path.clone())?;
+    let myaddr = script::p2pkh_address(&sender_key.public_key, chain)?;
+    let pubkey = PublicKey::from_slice(&sender_key.public_key).map_err(err_string)?;
     let script_pubkey = myaddr.to_script(chain);
 
     let utxos = store::list_utxos(&myaddr.0, 1000, false);
@@ -45,7 +48,7 @@ async fn create_signed_transaction(
         output: vec![
             TxOut {
                 value: input.amount,
-                script_pubkey: addr.to_script(chain),
+                script_pubkey: receiver.to_script(chain),
             },
             TxOut {
                 value: total_value.saturating_sub(input.amount + input.fee),
@@ -72,12 +75,11 @@ async fn create_signed_transaction(
     }
 
     let input_len = send_tx.input.len();
-    let path = ecdsa::account_path(&account);
     let mut sighasher = SighashCache::new(&mut send_tx);
 
     for i in 0..input_len {
         let hash = sighasher.signature_hash(i, &script_pubkey, EcdsaSighashType::All)?;
-        let sig = ecdsa::sign_with(&key_name, path.clone(), *hash).await?;
+        let sig = ecdsa::sign_with(&key_name, sender_key_path.clone(), *hash).await?;
         let signature = Signature::from_compact(&sig).map_err(err_string)?;
         sighasher
             .set_input_script(
@@ -93,6 +95,7 @@ async fn create_signed_transaction(
 
     Ok(canister::CreateSignedTransactionOutput {
         tx: ByteBuf::from(sighasher.transaction().to_bytes()),
+        tip_height: store::state::with(|s| s.tip_height),
         instructions: ic_cdk::api::performance_counter(1),
     })
 }

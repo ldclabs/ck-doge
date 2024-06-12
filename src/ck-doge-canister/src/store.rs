@@ -38,11 +38,10 @@ pub struct State {
     /// a testing key for testnet and mainnet
     pub ecdsa_key_name: String,
 
-    /// The Minter ECDSA public key
+    /// The canister ECDSA public key
     pub ecdsa_public_key: Option<ECDSAPublicKey>,
 
     pub rpc_proxy_public_key: String,
-    pub rpc_task_id: Option<u8>,
 
     /// The minimum number of confirmations on the Dogecoin chain.
     pub min_confirmations: u32,
@@ -282,8 +281,10 @@ pub mod state {
                 *h.borrow_mut() = s;
                 let mut s = h.borrow_mut();
                 // reset the tip to the last processed block
-                s.tip_height = s.processed_height;
-                s.tip_blockhash = s.processed_blockhash;
+                if s.processed_height > 0 {
+                    s.tip_height = s.processed_height;
+                    s.tip_blockhash = s.processed_blockhash;
+                }
             });
         });
     }
@@ -299,10 +300,10 @@ pub mod state {
     }
 }
 
-pub fn get_public_key(acc: &Account) -> Result<ECDSAPublicKey, String> {
+pub fn get_public_key(derivation_path: Vec<Vec<u8>>) -> Result<ECDSAPublicKey, String> {
     state::with(|s| {
         let pk = s.ecdsa_public_key.as_ref().ok_or("no ecdsa_public_key")?;
-        Ok(derive_public_key(pk, account_path(acc)))
+        Ok(derive_public_key(pk, derivation_path))
     })
 }
 

@@ -1,9 +1,9 @@
-use crate::api_init::InitArg;
 use candid::Principal;
 use ck_doge_types::canister;
 use ck_doge_types::canister::*;
 use std::collections::BTreeSet;
 
+use crate::api_init::ChainArgs;
 use crate::api_query::State;
 pub use icrc_ledger_types::icrc1::account::Account;
 

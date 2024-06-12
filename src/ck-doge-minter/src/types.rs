@@ -8,3 +8,28 @@ pub struct MintedUtxo {
     pub minted_at: u64, // timestamp in milliseconds
     pub utxo: Utxo,
 }
+
+pub type MintMemo = OutPoint;
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct BurnMemo {
+    pub address: Address,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct MintOutput {
+    pub amount: u64,
+    pub instructions: u64,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct BurnInput {
+    pub address: String,
+    pub amount: u64,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct BurnOutput {
+    pub txid: Txid,
+    pub tip_height: u64,
+    pub instructions: u64,
+}

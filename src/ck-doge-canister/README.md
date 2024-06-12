@@ -12,15 +12,26 @@ If you want to test your project locally, you can use the following commands:
 dfx start
 
 # deploy the canister
-dfx deploy ck-doge-canister --argument "
-  (opt record {
+dfx deploy ck-doge-canister --argument "(opt variant {Init =
+  record {
     chain = 32;
     min_confirmations = 42;
     ecdsa_key_name = \"dfx_test_key\";
-    prev_start_height = 0;
-    prev_start_blockhash = \"\";
-  })
-"
+    prev_start_height = 6265990;
+    prev_start_blockhash = \"8a2da40730d43d9ef53f85b1143ae7362294add9d92cc7660a6483b75a75527c\";
+  }
+})"
+
+dfx canister call ck-doge-canister get_state '()'
+
+# upgrade
+dfx deploy ck-doge-canister --argument "(opt variant {Upgrade =
+  record {
+    min_confirmations = opt 12;
+  }
+})"
+
+dfx canister call ck-doge-canister get_state '()'
 
 # set RPC agent
 dfx canister call ck-doge-canister admin_set_agent '
@@ -32,6 +43,8 @@ dfx canister call ck-doge-canister admin_set_agent '
     api_token = opt "HEADER_API_TOKEN"
   })
 '
+
+dfx canister call ck-doge-canister get_state '()'
 
 # start sync jobs to sync Dogecoin blocks and process transactions
 dfx canister call ck-doge-canister admin_restart_syncing '(false)'

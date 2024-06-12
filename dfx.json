@@ -17,6 +17,11 @@
       "package": "ck-doge-minter",
       "optimize": "cycles",
       "type": "rust"
+    },
+    "icrc1_ledger_canister": {
+      "candid": "https://raw.githubusercontent.com/dfinity/ic/d19fa446ab35780b2c6d8b82ea32d808cca558d5/rs/rosetta-api/icrc1/ledger/ledger.did",
+      "type": "custom",
+      "wasm": "https://download.dfinity.systems/ic/d19fa446ab35780b2c6d8b82ea32d808cca558d5/canisters/ic-icrc1-ledger.wasm.gz"
     }
   },
   "defaults": {

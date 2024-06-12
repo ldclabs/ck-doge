@@ -137,6 +137,7 @@ pub struct SendSignedTransactionInput {
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct SendSignedTransactionOutput {
     pub txid: Txid,
+    pub tip_height: u64,
     pub instructions: u64,
 }
 
@@ -145,10 +146,19 @@ pub struct CreateSignedTransactionInput {
     pub address: String,
     pub amount: u64,
     pub fee: u64,
+    pub from_subaccount: Option<[u8; 32]>,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct CreateSignedTransactionOutput {
     pub tx: ByteBuf,
+    pub tip_height: u64,
     pub instructions: u64,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct UtxosOutput {
+    pub tip_height: u64,
+    pub confirmed_height: u64,
+    pub utxos: Vec<Utxo>,
 }
