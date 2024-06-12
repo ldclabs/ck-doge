@@ -20,13 +20,14 @@ use std::str::FromStr;
 use std::{
     borrow::Cow,
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
+    time::Duration,
 };
 
 use crate::{
     chain,
     ecdsa::{account_path, derive_public_key, public_key_with, sign_with, ECDSAPublicKey},
-    ledger, minter_account, to_cbor_bytes, types, user_account, Account, MILLISECONDS,
+    ledger, to_cbor_bytes, types, user_account, Account, MILLISECONDS,
 };
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
@@ -55,6 +56,9 @@ pub struct State {
     pub chain_canister: Option<Principal>,
 
     pub managers: BTreeSet<Principal>,
+
+    #[serde(default)]
+    pub utxos_retry_burning_queue: VecDeque<(u64, canister::Address, u64)>,
 }
 
 impl State {
@@ -365,7 +369,8 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     }
 }
 
-const RETRIEVE_BATCH_SIZE: usize = 100;
+const MIN_RETRIEVE_BATCH_SIZE: usize = 10;
+const MAX_RETRIEVE_BATCH_SIZE: usize = 100;
 
 pub async fn burn_ckdoge(
     caller: Principal,
@@ -381,16 +386,7 @@ pub async fn burn_ckdoge(
         subaccount: None,
     };
 
-    let (chain_params, key_name, ecdsa_public_key) = state::with(|s| {
-        (
-            s.chain_params(),
-            s.ecdsa_key_name.clone(),
-            s.ecdsa_public_key.clone(),
-        )
-    });
-    let ecdsa_public_key = ecdsa_public_key.ok_or("no ecdsa_public_key")?;
-
-    let chain = state::get_chain()?;
+    let chain_params = state::with(|s| s.chain_params());
     let ledger = state::get_ledger()?;
     let receiver = script::Address::from_str(&address)?;
     if !receiver.is_p2pkh(chain_params) {
@@ -412,7 +408,9 @@ pub async fn burn_ckdoge(
             if v.1 == 0 {
                 total += utxo.3;
                 utxos.push((utxo, v.0));
-                if utxos.len() >= RETRIEVE_BATCH_SIZE {
+                if (utxos.len() >= MIN_RETRIEVE_BATCH_SIZE && total >= amount)
+                    || utxos.len() >= MAX_RETRIEVE_BATCH_SIZE
+                {
                     break;
                 }
             }
@@ -431,7 +429,6 @@ pub async fn burn_ckdoge(
     let memo = to_cbor_bytes(&types::BurnMemo {
         address: receiver.clone().into(),
     });
-    let burned_at = ic_cdk::api::time() / MILLISECONDS;
     let blk = ledger
         .burn(amount, ckdoge_acc, Memo(ByteBuf::from(memo)))
         .await?;
@@ -448,9 +445,127 @@ pub async fn burn_ckdoge(
         }
     });
 
+    match burn_utxos(blk, receiver.clone(), amount, utxos).await {
+        Ok(res) => Ok(res),
+        Err(err) => {
+            state::with_mut(|s| {
+                s.utxos_retry_burning_queue
+                    .push_back((blk, receiver.into(), amount));
+            });
+
+            // retry burn utxos after 30 seconds
+            ic_cdk_timers::set_timer(
+                Duration::from_secs(30),
+                || ic_cdk::spawn(retry_burn_utxos()),
+            );
+            Err(err)
+        }
+    }
+}
+
+// we can retry burn utxos if it failed in the previous burn_ckdoge call
+pub async fn retry_burn_utxos() {
+    if let Some((blk, receiver, amount)) =
+        state::with_mut(|s| s.utxos_retry_burning_queue.pop_front())
+    {
+        ic_cdk::print(format!(
+            "retry burn utxos after 30 seconds, block index: {blk}, receiver: {receiver:?}, amount: {amount}"
+        ));
+
+        let utxos = COLLECTED_UTXOS.with(|r| {
+            let m = r.borrow();
+            let mut utxos: Vec<(Utxo, Principal)> = vec![];
+            for (utxo, v) in m.iter() {
+                if v.1 == blk && v.2 == 0 {
+                    utxos.push((utxo, v.0));
+                }
+            }
+            utxos
+        });
+
+        if burn_utxos(blk, receiver.clone().into(), amount, utxos)
+            .await
+            .is_err()
+        {
+            state::with_mut(|s| {
+                s.utxos_retry_burning_queue
+                    .push_back((blk, receiver, amount));
+            });
+        }
+
+        // retry burn utxos after 30 seconds
+        ic_cdk_timers::set_timer(
+            Duration::from_secs(30),
+            || ic_cdk::spawn(retry_burn_utxos()),
+        );
+    }
+}
+
+pub async fn collect_and_clear_utxos() -> Result<u64, String> {
+    let minter = ic_cdk::id();
+    let addr = get_address(&user_account(&minter))?;
+
+    let chain = state::get_chain()?;
+    let res = chain.list_utxos(&addr).await?;
+    if res.utxos.is_empty() {
+        return Ok(0);
+    }
+
+    let confirmed_height = res.confirmed_height;
+    COLLECTED_UTXOS.with(|r| {
+        let mut m = r.borrow_mut();
+        let mut total: u64 = 0;
+        for utxo in res.utxos {
+            let utxo = Utxo(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
+            if !m.contains_key(&utxo) {
+                total += utxo.3;
+                m.insert(utxo, (minter, 0, 0));
+            }
+        }
+
+        let mut remove_utxos = vec![];
+        for (utxo, v) in m.iter() {
+            if v.2 > 0 && v.2 < confirmed_height {
+                remove_utxos.push(utxo);
+            }
+        }
+
+        // remove retrieved utxos in previous burned
+        for utxo in remove_utxos {
+            m.remove(&utxo);
+        }
+
+        Ok(total)
+    })
+}
+
+pub fn list_minted_utxos(caller: Principal) -> Vec<types::MintedUtxo> {
+    MINTED_UTXOS.with(|r| {
+        r.borrow()
+            .get(&caller)
+            .map_or_else(Vec::new, |utxos| utxos.into())
+    })
+}
+
+async fn burn_utxos(
+    block_index: u64,
+    receiver: script::Address,
+    amount: u64,
+    utxos: Vec<(Utxo, Principal)>,
+) -> Result<canister::SendSignedTransactionOutput, String> {
+    let (chain_params, key_name, ecdsa_public_key) = state::with(|s| {
+        (
+            s.chain_params(),
+            s.ecdsa_key_name.clone(),
+            s.ecdsa_public_key.clone(),
+        )
+    });
+    let ecdsa_public_key = ecdsa_public_key.ok_or("no ecdsa_public_key")?;
+    let chain = state::get_chain()?;
     let mut kc = KeysCache::new(&ecdsa_public_key, chain_params);
     let minter = kc.get_or_set(ic_cdk::id())?;
 
+    let total: u64 = utxos.iter().map(|u| u.0 .3).sum();
     let mut send_tx = Transaction {
         version: Transaction::CURRENT_VERSION,
         lock_time: 0,
@@ -508,64 +623,19 @@ pub async fn burn_ckdoge(
         let mut m = r.borrow_mut();
         // mark utxos as burned
         for utxo in utxos.iter() {
-            m.insert(utxo.0.clone(), (utxo.1, blk, res.tip_height));
+            m.insert(utxo.0.clone(), (utxo.1, block_index, res.tip_height));
         }
     });
 
+    let burned_at = ic_cdk::api::time() / MILLISECONDS;
     BURNED_UTXOS.with(|r| {
         r.borrow_mut().insert(
-            blk,
+            block_index,
             BurnedUtxo((utxos, receiver.into(), res.txid.clone(), burned_at)),
         );
     });
 
     Ok(res)
-}
-
-pub async fn collect_and_clear_utxos() -> Result<u64, String> {
-    let minter = ic_cdk::id();
-    let addr = get_address(&user_account(&minter))?;
-
-    let chain = state::get_chain()?;
-    let res = chain.list_utxos(&addr).await?;
-    if res.utxos.is_empty() {
-        return Ok(0);
-    }
-
-    let confirmed_height = res.confirmed_height;
-    COLLECTED_UTXOS.with(|r| {
-        let mut m = r.borrow_mut();
-        let mut total: u64 = 0;
-        for utxo in res.utxos {
-            let utxo = Utxo(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
-            if !m.contains_key(&utxo) {
-                total += utxo.3;
-                m.insert(utxo, (minter, 0, 0));
-            }
-        }
-
-        let mut remove_utxos = vec![];
-        for (utxo, v) in m.iter() {
-            if v.2 > 0 && v.2 < confirmed_height {
-                remove_utxos.push(utxo);
-            }
-        }
-
-        // remove retrieved utxos in previous burned
-        for utxo in remove_utxos {
-            m.remove(&utxo);
-        }
-
-        Ok(total)
-    })
-}
-
-pub fn list_minted_utxos(caller: Principal) -> Vec<types::MintedUtxo> {
-    MINTED_UTXOS.with(|r| {
-        r.borrow()
-            .get(&caller)
-            .map_or_else(Vec::new, |utxos| utxos.into())
-    })
 }
 
 struct KeyInfo {

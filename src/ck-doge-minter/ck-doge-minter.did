@@ -27,6 +27,7 @@ type State = record {
   ecdsa_key_name : opt text;
   managers : vec principal;
   chain : text;
+  utxos_retry_burning_queue : vec record { nat64; blob; nat64 };
   collected_utxos : nat64;
   tokens_burned : nat64;
   accounts : nat64;

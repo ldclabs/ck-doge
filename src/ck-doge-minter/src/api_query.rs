@@ -1,4 +1,5 @@
 use candid::{CandidType, Principal};
+use ck_doge_types::canister;
 use std::collections::BTreeSet;
 
 use crate::{is_authenticated, is_controller_or_manager, store, types, user_account};
@@ -22,6 +23,7 @@ pub struct State {
     pub managers: BTreeSet<Principal>,
     // manager info
     pub ecdsa_key_name: Option<String>,
+    pub utxos_retry_burning_queue: Vec<(u64, canister::Address, u64)>,
 }
 
 #[ic_cdk::query]
@@ -42,6 +44,7 @@ fn get_state() -> Result<State, ()> {
 
         if is_controller_or_manager().is_ok() {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
+            res.utxos_retry_burning_queue = s.utxos_retry_burning_queue.clone().into();
         }
         res
     }))
