@@ -66,6 +66,27 @@ impl State {
     pub fn chain_params(&self) -> &'static ChainParams {
         chain_from_key_bits(self.chain)
     }
+
+    pub fn get_chain(&self) -> Result<chain::Chain, String> {
+        self.chain_canister
+            .map(chain::Chain::new)
+            .ok_or("no chain_canister".to_string())
+    }
+
+    pub fn get_ledger(&self) -> Result<ledger::Ledger, String> {
+        self.ledger_canister
+            .map(ledger::Ledger::new)
+            .ok_or("no ledger_canister".to_string())
+    }
+
+    pub fn get_address(&self, acc: &Account) -> Result<script::Address, String> {
+        let pk = self
+            .ecdsa_public_key
+            .as_ref()
+            .ok_or("no ecdsa_public_key")?;
+        let pk = derive_public_key(pk, account_path(acc));
+        script::p2pkh_address(&pk.public_key, self.chain_params())
+    }
 }
 
 impl Storable for State {
@@ -83,25 +104,28 @@ impl Storable for State {
 }
 
 #[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Utxo(pub u64, pub [u8; 32], pub u32, pub u64);
+pub struct UtxoState(pub u64, pub [u8; 32], pub u32, pub u64);
 
-impl Storable for Utxo {
-    const BOUND: Bound = Bound::Unbounded;
+impl Storable for UtxoState {
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 90,
+        is_fixed_size: false,
+    };
 
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode Utxo data");
+        into_writer(self, &mut buf).expect("failed to encode UtxoState data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode Utxo data")
+        from_reader(&bytes[..]).expect("failed to decode UtxoState data")
     }
 }
 
 // principal -> MintedUtxos
 #[derive(Clone, Default, Deserialize, Serialize)]
-pub struct MintedUtxos(BTreeMap<Utxo, (u64, u64)>);
+pub struct MintedUtxos(BTreeMap<UtxoState, (u64, u64)>);
 
 impl From<MintedUtxos> for Vec<types::MintedUtxo> {
     fn from(utxos: MintedUtxos) -> Self {
@@ -140,7 +164,7 @@ impl Storable for MintedUtxos {
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct BurnedUtxo(
     (
-        Vec<(Utxo, Principal)>,
+        Vec<(UtxoState, Principal)>,
         canister::Address,
         canister::Txid,
         u64,
@@ -186,7 +210,7 @@ thread_local! {
         )
     );
 
-    static COLLECTED_UTXOS: RefCell<StableBTreeMap<Utxo, (Principal, u64, u64), Memory>> = RefCell::new(
+    static COLLECTED_UTXOS: RefCell<StableBTreeMap<UtxoState, (Principal, u64, u64), Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(COLLECTED_UTXOS_MEMORY_ID)),
         )
@@ -204,24 +228,6 @@ pub mod state {
 
     pub fn is_manager(caller: &Principal) -> bool {
         STATE_HEAP.with(|r| r.borrow().managers.contains(caller))
-    }
-
-    pub fn get_chain() -> Result<chain::Chain, String> {
-        STATE_HEAP.with(|r| {
-            r.borrow()
-                .chain_canister
-                .map(chain::Chain::new)
-                .ok_or("no chain_canister".to_string())
-        })
-    }
-
-    pub fn get_ledger() -> Result<ledger::Ledger, String> {
-        STATE_HEAP.with(|r| {
-            r.borrow()
-                .ledger_canister
-                .map(ledger::Ledger::new)
-                .ok_or("no ledger_canister".to_string())
-        })
     }
 
     pub fn get_accounts_len() -> u64 {
@@ -286,19 +292,8 @@ pub mod state {
     }
 }
 
-pub fn get_public_key(derivation_path: Vec<Vec<u8>>) -> Result<ECDSAPublicKey, String> {
-    state::with(|s| {
-        let pk = s.ecdsa_public_key.as_ref().ok_or("no ecdsa_public_key")?;
-        Ok(derive_public_key(pk, derivation_path))
-    })
-}
-
 pub fn get_address(acc: &Account) -> Result<canister::Address, String> {
-    state::with(|s| {
-        let pk = s.ecdsa_public_key.as_ref().ok_or("no ecdsa_public_key")?;
-        let pk = derive_public_key(pk, account_path(acc));
-        script::p2pkh_address(&pk.public_key, s.chain_params()).map(|addr| addr.into())
-    })
+    state::with(|s| s.get_address(acc).map(|addr| addr.into()))
 }
 
 pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
@@ -308,10 +303,10 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     };
 
     let doge_acc = user_account(&caller);
-    let addr = get_address(&doge_acc)?;
-    let chain = state::get_chain()?;
-    let ledger = state::get_ledger()?;
-    let utxos = chain.list_utxos(&addr).await?.utxos;
+    let (addr, chain, ledger) = state::with(|s| {
+        Ok::<_, String>((s.get_address(&doge_acc)?, s.get_chain()?, s.get_ledger()?))
+    })?;
+    let utxos = chain.list_utxos(&addr.into()).await?.utxos;
     if utxos.is_empty() {
         return Err("no utxos found".to_string());
     }
@@ -320,7 +315,7 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     let utxos = utxos
         .into_iter()
         .filter_map(|tx| {
-            let utxo = Utxo(tx.height, tx.txid.0, tx.vout, tx.value);
+            let utxo = UtxoState(tx.height, tx.txid.0, tx.vout, tx.value);
             if minted_utxos.0.contains_key(&utxo) {
                 None
             } else {
@@ -392,7 +387,7 @@ pub async fn burn_ckdoge(
     };
 
     let chain_params = state::with(|s| s.chain_params());
-    let ledger = state::get_ledger()?;
+    let ledger = state::with(|s| s.get_ledger())?;
     let receiver = script::Address::from_str(&address)?;
     if !receiver.is_p2pkh(chain_params) {
         return Err("invalid p2pkh address".to_string());
@@ -408,7 +403,7 @@ pub async fn burn_ckdoge(
     let (utxos, total) = COLLECTED_UTXOS.with(|r| {
         let m = r.borrow();
         let mut total: u64 = 0;
-        let mut utxos: Vec<(Utxo, Principal)> = vec![];
+        let mut utxos: Vec<(UtxoState, Principal)> = vec![];
         for (utxo, v) in m.iter() {
             if v.1 == 0 {
                 total += utxo.3;
@@ -479,7 +474,7 @@ pub async fn retry_burn_utxos() {
 
         let utxos = COLLECTED_UTXOS.with(|r| {
             let m = r.borrow();
-            let mut utxos: Vec<(Utxo, Principal)> = vec![];
+            let mut utxos: Vec<(UtxoState, Principal)> = vec![];
             for (utxo, v) in m.iter() {
                 if v.1 == blk && v.2 == 0 {
                     utxos.push((utxo, v.0));
@@ -509,10 +504,10 @@ pub async fn retry_burn_utxos() {
 
 pub async fn collect_and_clear_utxos() -> Result<u64, String> {
     let minter = ic_cdk::id();
-    let addr = get_address(&user_account(&minter))?;
+    let acc = user_account(&minter);
+    let (addr, chain) = state::with(|s| Ok::<_, String>((s.get_address(&acc)?, s.get_chain()?)))?;
 
-    let chain = state::get_chain()?;
-    let res = chain.list_utxos(&addr).await?;
+    let res = chain.list_utxos(&addr.into()).await?;
     if res.utxos.is_empty() {
         return Ok(0);
     }
@@ -522,7 +517,7 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
         let mut m = r.borrow_mut();
         let mut total: u64 = 0;
         for utxo in res.utxos {
-            let utxo = Utxo(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
+            let utxo = UtxoState(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
             if !m.contains_key(&utxo) {
                 total += utxo.3;
                 m.insert(utxo, (minter, 0, 0));
@@ -558,7 +553,7 @@ async fn burn_utxos(
     receiver: script::Address,
     amount: u64,
     fee_rate: u64,
-    utxos: Vec<(Utxo, Principal)>,
+    utxos: Vec<(UtxoState, Principal)>,
 ) -> Result<canister::SendSignedTransactionOutput, String> {
     let (chain_params, key_name, ecdsa_public_key) = state::with(|s| {
         (
@@ -568,7 +563,7 @@ async fn burn_utxos(
         )
     });
     let ecdsa_public_key = ecdsa_public_key.ok_or("no ecdsa_public_key")?;
-    let chain = state::get_chain()?;
+    let chain = state::with(|s| s.get_chain())?;
     let mut kc = KeysCache::new(&ecdsa_public_key, chain_params);
     let minter = kc.get_or_set(ic_cdk::id())?;
 
@@ -652,16 +647,16 @@ struct KeyInfo {
 }
 
 struct KeysCache<'a> {
-    ecdsa_public_key: &'a ECDSAPublicKey,
     chain_params: &'a ChainParams,
+    ecdsa_public_key: &'a ECDSAPublicKey,
     keys: BTreeMap<Principal, KeyInfo>,
 }
 
 impl<'a> KeysCache<'a> {
     fn new(ecdsa_public_key: &'a ECDSAPublicKey, chain_params: &'a ChainParams) -> Self {
         Self {
-            ecdsa_public_key,
             chain_params,
+            ecdsa_public_key,
             keys: BTreeMap::new(),
         }
     }
@@ -684,5 +679,30 @@ impl<'a> KeysCache<'a> {
         }
 
         Ok(self.keys.get(&caller).unwrap())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use hex::DisplayHex;
+
+    #[test]
+    fn test_bound_max_size() {
+        let v = UtxoState(u64::MAX, [255u8; 32], u32::MAX, u64::MAX);
+        let v = v.to_bytes();
+        println!(
+            "UtxoState max_size: {}, {}",
+            v.len(),
+            v.to_lower_hex_string()
+        );
+
+        let v = UtxoState(0, [0u8; 32], 0, 0);
+        let v = v.to_bytes();
+        println!(
+            "UtxoState min_size: {}, {}",
+            v.len(),
+            v.to_lower_hex_string()
+        );
     }
 }

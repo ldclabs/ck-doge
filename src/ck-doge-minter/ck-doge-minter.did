@@ -31,7 +31,9 @@ type State = record {
   collected_utxos : nat64;
   tokens_burned : nat64;
   accounts : nat64;
+  minter_subaddress : opt text;
   ledger_canister : opt principal;
+  minter_address : opt text;
   burned_utxos : nat64;
   chain_canister : opt principal;
   tokens_minted : nat64;

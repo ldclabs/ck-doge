@@ -2,7 +2,9 @@ use candid::{CandidType, Principal};
 use ck_doge_types::canister;
 use std::collections::BTreeSet;
 
-use crate::{is_authenticated, is_controller_or_manager, store, types, user_account};
+use crate::{
+    is_authenticated, is_controller_or_manager, minter_account, store, types, user_account,
+};
 
 #[ic_cdk::query]
 fn api_version() -> u16 {
@@ -24,6 +26,8 @@ pub struct State {
     // manager info
     pub ecdsa_key_name: Option<String>,
     pub utxos_retry_burning_queue: Vec<(u64, canister::Address, u64, u64, u8)>,
+    pub minter_address: Option<String>,
+    pub minter_subaddress: Option<String>,
 }
 
 #[ic_cdk::query]
@@ -45,6 +49,11 @@ fn get_state() -> Result<State, ()> {
         if is_controller_or_manager().is_ok() {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
             res.utxos_retry_burning_queue = s.utxos_retry_burning_queue.clone().into();
+            res.minter_address = s.get_address(&minter_account()).map(|v| v.to_string()).ok();
+            res.minter_subaddress = s
+                .get_address(&user_account(&ic_cdk::id()))
+                .map(|v| v.to_string())
+                .ok();
         }
         res
     }))

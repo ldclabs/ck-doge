@@ -127,6 +127,22 @@ impl Storable for UnspentTxState {
 // address -> UnspentOutput
 #[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UtxoState(pub u64, pub [u8; 32], pub u32, pub u64);
+impl Storable for UtxoState {
+    const BOUND: Bound = Bound::Bounded {
+        max_size: 90,
+        is_fixed_size: false,
+    };
+
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut buf = vec![];
+        into_writer(self, &mut buf).expect("failed to encode UtxoState data");
+        Cow::Owned(buf)
+    }
+
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
+        from_reader(&bytes[..]).expect("failed to decode UtxoState data")
+    }
+}
 
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub struct UtxoStates(BTreeSet<UtxoState>);

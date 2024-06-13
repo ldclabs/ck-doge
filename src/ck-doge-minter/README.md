@@ -69,6 +69,7 @@ dfx canister call b77ix-eeaaa-aaaaa-qaada-cai icrc2_approve '(record {spender=re
 dfx canister call ck-doge-minter burn_ckdoge '(record {
   address = "nYmJMro1rtZvHWm5a4WxTE77bGYtRYrfao";
   amount = 10_000_000;
+  fee_rate = 1000;
 })'
 
 # list my minted utxos
