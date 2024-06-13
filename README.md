@@ -13,16 +13,16 @@ Chain-key Dogecoin (CK-Doge) offers on-chain integration with the Dogecoin netwo
 
 ## Overview
 
-CK-Doge offers on-chain integration with the Dogecoin network on the [Internet Computer](https://internetcomputer.org/).
+**CK-Doge** offers on-chain integration with the Dogecoin network on the [Internet Computer](https://internetcomputer.org/).
 
 CK-Doge leverages the technical design of Bitcoin Integration on the ICP, bringing Dogecoin from first-generation blockchain to third-generation blockchain in a streamlined and cost-effective manner.
 
 A canister smart contract, the CK-Doge Canister, can operates effectively as an on-chain “Dogecoin light node”, receiving, holding, and indexing the complete set of [unspent transaction outputs (UTXOs)](https://en.wikipedia.org/wiki/Unspent_transaction_output) in an efficiently queryable form.
 This CK-Doge Canister offers API on ICP the ability to submit signed transactions to the Dogecoin network. Submitted Dogecoin transactions are signed using [chain-key ECDSA (ckECDSA) signatures](https://internetcomputer.org/docs/current/developer-docs/integrations/t-ecdsa), an enhanced version of threshold ECDSA available only on the Internet Computer.
 
-ckECDSA combined with the CK-Doge offers canister smart contracts running on ICP the ability to custody and transact native Dogecoin without the need for any additional third-party off-chain custodial or bridging solutions.
+**ckECDSA** combined with the CK-Doge offers canister smart contracts running on ICP the ability to custody and transact native Dogecoin without the need for any additional third-party off-chain custodial or bridging solutions.
 
-ckDOGE is a pair of ICP smart contracts building on the CK-Doge canisters and ckECDSA services. The contracts work together to enable users and canister smart contracts on ICP to send and receive DOGE value within seconds — far faster than is possible with native DOGE chain transactions, while also always allowing users and smart contracts to send and receive value to and from native DOGE network addresses.
+**ckDOGE** is a pair of ICP smart contracts building on the CK-Doge canisters and ckECDSA services. The contracts work together to enable users and canister smart contracts on ICP to send and receive DOGE value within seconds — far faster than is possible with native DOGE chain transactions, while also always allowing users and smart contracts to send and receive value to and from native DOGE network addresses.
 
 ckDOGE exposes ICRC-1 and ICRC-2 ledger interfaces (the fungible token standards of ICP), making it simple for all wallets on the Internet Computer to offer ckDOGE support. Many wallets also support the additional inter-network transfers to and from DOGE addresses.
 
@@ -35,16 +35,15 @@ The CK-Doge Minter and [ckDOGE Ledger (ICRC-1 Ledger)](https://github.com/dfinit
 The ckDOGE functionality is provided through an interplay of three canisters:
 
 - The CK-Doge canister: responsible for interacting with the Dogecoin network and indexing UTXOs.
-- The CK-Doge minter: responsible for minting and burning ckDOGE tokens.
+- The CK-Doge minter: responsible for minting and burning ckDOGE tokens backed 1:1 by DOGE.
 - The ckDOGE ledger: responsible for keeping account balances and for transferring ckDOGE between accounts.
-
 
 ### Mint ckDOGE workflow
 
 1. A user get the Dogecoin address from the CK-Doge minter.
 2. User sends DOGE to the Dogecoin address.
 3. User calls the CK-Doge minter to mint ckDOGE tokens. The transaction should has 42 confirmations before minting.
-4. The CK-Doge minter occupy the UTXOs and mints ckDOGE tokens on the ledger to the user.
+4. The CK-Doge minter occupies the UTXOs and mints ckDOGE tokens on the ledger to the user.
 
 ![Mint ckDOGE](./mint-ckdoge-sequence-chart.webp)
 
@@ -56,9 +55,11 @@ The ckDOGE functionality is provided through an interplay of three canisters:
 ![Burn ckDOGE](./burn-ckdoge-sequence-chart.webp)
 
 ## Reference
-- [Chain Fusion (Chain-key)](https://internetcomputer.org/docs/current/developer-docs/multi-chain/overview)
-- [Bitcoin Integration on the ICP](https://internetcomputer.org/docs/current/developer-docs/multi-chain/bitcoin/overview)
-- [ckBTC Overview](https://internetcomputer.org/docs/current/developer-docs/multi-chain/chain-key-tokens/ckbtc/overview)
+
+- [Bitcoin Integration Overview](https://internetcomputer.org/bitcoin-integration)
+- [Chain Fusion (Chain-key) Documentation](https://internetcomputer.org/docs/current/developer-docs/multi-chain/overview)
+- [Bitcoin Integration Documentation](https://internetcomputer.org/docs/current/developer-docs/multi-chain/bitcoin/overview)
+- [ckBTC Documentation](https://internetcomputer.org/docs/current/developer-docs/multi-chain/chain-key-tokens/ckbtc/overview)
 - [Idempotent Proxy](https://github.com/ldclabs/idempotent-proxy)
 - [Dogecoin Home](https://dogecoin.com/)
 
