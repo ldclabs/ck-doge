@@ -1,6 +1,6 @@
 [package]
 name = "ck-doge-types"
-description = "Types for dogecoin chain data"
+description = "General purpose rust library for using and interoperating with Dogecoin."
 publish = true
 
 version.workspace = true

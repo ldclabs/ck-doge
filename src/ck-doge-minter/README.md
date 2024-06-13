@@ -1,7 +1,5 @@
-# ckDOGE: ck-doge-canister
-Chain-key Dogecoin (ckDOGE) is an ICRC-2-compliant token that is backed 1:1 by DOGE held 100% on the [ICP](https://internetcomputer.org/).
-
-The `ck-doge-canister` enables other canisters deployed on the Internet Computer to use Dogecoin and interact with the Dogecoin network
+# CK-Doge: `ck-doge-minter`
+Mint and burn `ckDOGE` <-> `DOGE` on the [Internet Computer](https://internetcomputer.org/).
 
 ## Running the project locally
 

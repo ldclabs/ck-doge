@@ -1,6 +1,6 @@
 [package]
 name = "ck-doge-minter"
-description = "The ckDOGE Minter canister converts DOGE to ckDOGE and back"
+description = "Mint and burn ckDOGE <-> DOGE on the Internet Computer."
 repository = "https://github.com/ldclabs/ck-doge/tree/main/src/ic-oss-minter"
 publish = false
 

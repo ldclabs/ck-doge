@@ -1,6 +1,6 @@
 [package]
 name = "ck-doge-canister"
-description = "The ckDOGE canister enables other canisters deployed on the Internet Computer to use Dogecoin and interact with the Dogecoin network"
+description = "Interact with Dogecoin network from the Internet Computer."
 repository = "https://github.com/ldclabs/ck-doge/tree/main/src/ck-doge-canister"
 publish = false
 
