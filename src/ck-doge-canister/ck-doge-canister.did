@@ -44,7 +44,6 @@ type State = record {
   start_height : nat64;
   processed_height : nat64;
   tip_height : nat64;
-  rpc_agent : opt RPCAgent;
   ecdsa_key_name : opt text;
   managers : vec principal;
   rpc_proxy_public_key : opt text;
@@ -59,6 +58,7 @@ type State = record {
   unconfirmed_utxs : nat64;
   min_confirmations : nat32;
   processed_blockhash : text;
+  rpc_agents : vec RPCAgent;
   confirmed_utxos : nat64;
   start_blockhash : text;
 };
@@ -77,7 +77,7 @@ type UtxosOutput = record {
 };
 service : (opt ChainArgs) -> {
   admin_restart_syncing : (bool) -> (Result);
-  admin_set_agent : (RPCAgent) -> (Result);
+  admin_set_agent : (vec RPCAgent) -> (Result);
   admin_set_managers : (vec principal) -> (Result);
   api_version : () -> (nat16) query;
   create_signed_transaction : (CreateSignedTransactionInput) -> (Result_1);

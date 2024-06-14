@@ -360,7 +360,9 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
         Ok(_) => Ok(total_amount),
         Err(err) => {
             if total_amount > 0 {
-                Err(format!("minted {total_amount} ckDOGE, error: {err}"))
+                Err(format!(
+                    "minted {total_amount} ckDOGE, and some UTXOs failed: {err}"
+                ))
             } else {
                 Err(err)
             }

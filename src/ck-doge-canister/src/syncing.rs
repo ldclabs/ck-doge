@@ -1,4 +1,5 @@
-use ck_doge_types::jsonrpc::DogecoinRPC;
+use ck_doge_types::{canister::RPCAgent, jsonrpc::DogecoinRPC};
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::{ecdsa, store, SECONDS};
@@ -7,20 +8,31 @@ pub const REFRESH_PROXY_TOKEN_INTERVAL: u64 = 60 * 5; // 5 minute
 const FETCH_BLOCK_AFTER: u64 = 20; // 20 seconds
 
 pub async fn refresh_proxy_token() {
-    let (ecdsa_key_name, mut rpc_agent) =
-        store::state::with(|s| (s.ecdsa_key_name.clone(), s.rpc_agent.clone()));
-    let token = ecdsa::sign_proxy_token(
-        &ecdsa_key_name,
-        (ic_cdk::api::time() / SECONDS) + REFRESH_PROXY_TOKEN_INTERVAL + 120,
-        &rpc_agent.name,
-    )
-    .await
-    .expect("failed to sign proxy token");
+    let (ecdsa_key_name, rpc_agent) =
+        store::state::with(|s| (s.ecdsa_key_name.clone(), s.rpc_agents.clone()));
+    update_proxy_token(ecdsa_key_name, rpc_agent).await;
+}
 
-    rpc_agent.proxy_token = Some(token);
-    store::state::with_mut(|r| {
-        r.rpc_agent = rpc_agent;
-    });
+pub async fn update_proxy_token(ecdsa_key_name: String, mut rpc_agents: Vec<RPCAgent>) {
+    let mut tokens: BTreeMap<String, String> = BTreeMap::new();
+    for agent in rpc_agents.iter_mut() {
+        if let Some(token) = tokens.get(&agent.name) {
+            agent.proxy_token = Some(token.clone());
+            continue;
+        }
+
+        let token = ecdsa::sign_proxy_token(
+            &ecdsa_key_name,
+            (ic_cdk::api::time() / SECONDS) + REFRESH_PROXY_TOKEN_INTERVAL + 120,
+            &agent.name,
+        )
+        .await
+        .expect("failed to sign proxy token");
+        tokens.insert(agent.name.clone(), token.clone());
+        agent.proxy_token = Some(token);
+    }
+
+    store::state::with_mut(|r| r.rpc_agents = rpc_agents);
 }
 
 enum FetchBlockError {
@@ -40,13 +52,26 @@ pub async fn fetch_block() {
             tip_height + 1
         };
 
-        let blockhash = DogecoinRPC::get_blockhash(&agent, format!("blk-{height}"), height)
+        let key = format!("blk-{height}");
+        let blockhash = DogecoinRPC::get_blockhash(&agent, key.clone(), height)
             .await
             .map_err(FetchBlockError::ShouldWait)?;
         let block = DogecoinRPC::get_block(&agent, blockhash.to_string(), &blockhash)
             .await
             .map_err(FetchBlockError::Other)?;
         store::append_block(height, blockhash, block).map_err(FetchBlockError::Other)?;
+
+        for attester in store::state::get_attest_agents() {
+            let hash = DogecoinRPC::get_blockhash(&attester, key.clone(), height)
+                .await
+                .map_err(FetchBlockError::Other)?;
+            if hash != blockhash {
+                return Err(FetchBlockError::Other(format!(
+                    "attester {} returned different blockhash at {}: {:?}, expected {:?}",
+                    attester.name, height, hash, blockhash
+                )));
+            }
+        }
         Ok(())
     }
     .await;

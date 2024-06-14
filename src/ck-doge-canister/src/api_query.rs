@@ -30,7 +30,7 @@ pub struct State {
     pub managers: BTreeSet<Principal>,
     // manager info
     pub rpc_proxy_public_key: Option<String>,
-    pub rpc_agent: Option<RPCAgent>,
+    pub rpc_agents: Vec<RPCAgent>,
     pub ecdsa_key_name: Option<String>,
     pub syncing_status: Option<i8>,
 }
@@ -61,7 +61,7 @@ fn get_state() -> Result<State, ()> {
         if is_controller_or_manager().is_ok() {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
             res.rpc_proxy_public_key = Some(s.rpc_proxy_public_key.clone());
-            res.rpc_agent = Some(s.rpc_agent.clone());
+            res.rpc_agents.clone_from(&s.rpc_agents);
             store::syncing::with(|s| {
                 res.syncing_status = Some(s.status);
             });

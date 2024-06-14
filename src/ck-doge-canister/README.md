@@ -33,12 +33,20 @@ dfx canister call ck-doge-canister get_state '()'
 
 # set RPC agent
 dfx canister call ck-doge-canister admin_set_agent '
-  (record {
-    name = "ICPanda";
-    endpoint = "https://doge-test-rpc.panda.fans/URL_DOGE_TEST";
-    max_cycles = 10000000000;
-    proxy_token = null;
-    api_token = opt "HEADER_API_TOKEN"
+  (vec {
+    record {
+      name = "ICPanda";
+      endpoint = "https://doge-test-rpc.panda.fans/URL_DOGE_TEST";
+      max_cycles = 10000000000;
+      proxy_token = null;
+      api_token = opt "HEADER_API_TOKEN"
+    }; record {
+      name = "ICPanda";
+      endpoint = "https://doge-test-rpc.panda.fans/URL_DOGE_TEST";
+      max_cycles = 10000000000;
+      proxy_token = null;
+      api_token = opt "HEADER_API_TOKEN"
+    }
   })
 '
 

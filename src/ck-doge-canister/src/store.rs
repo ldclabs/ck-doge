@@ -61,7 +61,7 @@ pub struct State {
     pub last_errors: VecDeque<String>,
 
     pub managers: BTreeSet<Principal>,
-    pub rpc_agent: RPCAgent,
+    pub rpc_agents: Vec<RPCAgent>,
 
     pub unconfirmed_utxs: BTreeMap<ByteN<32>, UnspentTxState>,
     pub unconfirmed_utxos: BTreeMap<ByteN<21>, (UtxoStates, SpentUtxos)>,
@@ -245,7 +245,17 @@ pub mod state {
     }
 
     pub fn get_agent() -> RPCAgent {
-        STATE_HEAP.with(|r| r.borrow().rpc_agent.clone())
+        STATE_HEAP.with(|r| r.borrow().rpc_agents.first().expect("no RPCAgent").clone())
+    }
+
+    pub fn get_attest_agents() -> Vec<RPCAgent> {
+        STATE_HEAP.with(|r| {
+            r.borrow()
+                .rpc_agents
+                .split_first()
+                .map(|(_, v)| v.to_vec())
+                .unwrap_or_default()
+        })
     }
 
     pub fn get_unprocessed_blocks_len() -> u64 {

@@ -3,7 +3,7 @@ use ck_doge_types::canister;
 use std::collections::BTreeSet;
 use std::time::Duration;
 
-use crate::{ecdsa, is_controller, is_controller_or_manager, store, syncing, ANONYMOUS, SECONDS};
+use crate::{is_controller, is_controller_or_manager, store, syncing, ANONYMOUS};
 
 #[ic_cdk::update(guard = "is_controller")]
 fn admin_set_managers(args: BTreeSet<Principal>) -> Result<(), String> {
@@ -25,18 +25,12 @@ fn validate_admin_set_managers(args: BTreeSet<Principal>) -> Result<(), String> 
 }
 
 #[ic_cdk::update(guard = "is_controller_or_manager")]
-async fn admin_set_agent(mut arg: canister::RPCAgent) -> Result<(), String> {
-    let token = ecdsa::sign_proxy_token(
-        &store::state::with(|s| s.ecdsa_key_name.clone()),
-        (ic_cdk::api::time() / SECONDS) + syncing::REFRESH_PROXY_TOKEN_INTERVAL * 2,
-        &arg.name,
-    )
-    .await?;
-
-    arg.proxy_token = Some(token);
-    store::state::with_mut(|s| {
-        s.rpc_agent = arg;
-    });
+async fn admin_set_agent(agents: Vec<canister::RPCAgent>) -> Result<(), String> {
+    if agents.is_empty() {
+        return Err("agents cannot be empty".to_string());
+    }
+    let ecdsa_key_name = store::state::with(|s| s.ecdsa_key_name.clone());
+    syncing::update_proxy_token(ecdsa_key_name, agents).await;
 
     if store::syncing::with(|s| s.refresh_proxy_token_timer.is_none()) {
         store::syncing::with_mut(|s| {
