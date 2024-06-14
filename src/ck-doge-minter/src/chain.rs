@@ -29,6 +29,6 @@ impl Chain {
         &self,
         address: &canister::Address,
     ) -> Result<canister::UtxosOutput, String> {
-        call(self.0, "list_utxos_b", (address.0, 1000u16, true)).await?
+        call(self.0, "list_utxos_b", (*address.0, 1000u16, true)).await?
     }
 }

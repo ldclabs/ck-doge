@@ -28,7 +28,7 @@ async fn create_signed_transaction(
     let receiver = script::Address::from_str(&input.address)?;
     let sender = Account {
         owner: ic_cdk::caller(),
-        subaccount: input.from_subaccount,
+        subaccount: input.from_subaccount.map(|v| *v),
     };
     let sender_key_path = ecdsa::account_path(&sender);
 
@@ -38,7 +38,7 @@ async fn create_signed_transaction(
     let pubkey = PublicKey::from_slice(&sender_key.public_key).map_err(err_string)?;
     let script_pubkey = myaddr.to_script(chain);
 
-    let utxos = store::list_utxos(&myaddr.0, 1000, false);
+    let utxos = store::list_utxos(&myaddr.0.into(), 1000, false);
     let total_value: u64 = utxos.iter().map(|u| u.value).sum();
 
     let mut send_tx = Transaction {

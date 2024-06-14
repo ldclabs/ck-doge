@@ -103,12 +103,12 @@ impl Storable for State {
     }
 }
 
-#[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UtxoState(pub u64, pub [u8; 32], pub u32, pub u64);
+#[derive(Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UtxoState(pub u64, pub canister::ByteN<32>, pub u32, pub u64);
 
 impl Storable for UtxoState {
     const BOUND: Bound = Bound::Bounded {
-        max_size: 90,
+        max_size: 58,
         is_fixed_size: false,
     };
 
@@ -137,7 +137,7 @@ impl From<MintedUtxos> for Vec<types::MintedUtxo> {
                 minted_at: v.1,
                 utxo: canister::Utxo {
                     height: k.0,
-                    txid: canister::Txid(k.1),
+                    txid: k.1.into(),
                     vout: k.2,
                     value: k.3,
                 },
@@ -315,7 +315,7 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     let utxos = utxos
         .into_iter()
         .filter_map(|tx| {
-            let utxo = UtxoState(tx.height, tx.txid.0, tx.vout, tx.value);
+            let utxo = UtxoState(tx.height, tx.txid.0.into(), tx.vout, tx.value);
             if minted_utxos.0.contains_key(&utxo) {
                 None
             } else {
@@ -332,7 +332,7 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     let res: Result<(), String> = async {
         for tx in utxos {
             let memo = to_cbor_bytes(&types::MintMemo {
-                txid: canister::Txid(tx.1),
+                txid: tx.1.into(),
                 vout: tx.2,
             });
             let blk = ledger
@@ -517,7 +517,7 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
         let mut m = r.borrow_mut();
         let mut total: u64 = 0;
         for utxo in res.utxos {
-            let utxo = UtxoState(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
+            let utxo = UtxoState(utxo.height, utxo.txid.0.into(), utxo.vout, utxo.value);
             if !m.contains_key(&utxo) {
                 total += utxo.3;
                 m.insert(utxo, (minter, 0, 0));
@@ -575,7 +575,7 @@ async fn burn_utxos(
             .iter()
             .map(|tx| {
                 TxIn::with_outpoint(OutPoint {
-                    txid: canister::Txid(tx.0 .1).into(),
+                    txid: canister::Txid::from(tx.0 .1).into(),
                     vout: tx.0 .2,
                 })
             })
@@ -689,20 +689,27 @@ mod test {
 
     #[test]
     fn test_bound_max_size() {
-        let v = UtxoState(u64::MAX, [255u8; 32], u32::MAX, u64::MAX);
+        let v = UtxoState(
+            u64::MAX,
+            canister::ByteN::from([255u8; 32]),
+            u32::MAX,
+            u64::MAX,
+        );
         let v = v.to_bytes();
         println!(
             "UtxoState max_size: {}, {}",
             v.len(),
             v.to_lower_hex_string()
         );
+        // UtxoState max_size: 58, 841bffffffffffffffff5820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1affffffff1bffffffffffffffff
 
-        let v = UtxoState(0, [0u8; 32], 0, 0);
+        let v = UtxoState(0, canister::ByteN::from([0u8; 32]), 0, 0);
         let v = v.to_bytes();
         println!(
             "UtxoState min_size: {}, {}",
             v.len(),
             v.to_lower_hex_string()
         );
+        // UtxoState min_size: 38, 8400582000000000000000000000000000000000000000000000000000000000000000000000
     }
 }

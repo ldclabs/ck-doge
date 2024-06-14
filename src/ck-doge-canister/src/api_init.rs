@@ -35,8 +35,9 @@ fn init(args: Option<ChainArgs>) {
                 s.ecdsa_key_name = args.ecdsa_key_name;
                 s.tip_height = args.prev_start_height;
                 if args.prev_start_height > 0 || !args.prev_start_blockhash.is_empty() {
-                    s.tip_blockhash = *BlockHash::from_str(&args.prev_start_blockhash)
-                        .expect("invalid blockhash");
+                    s.tip_blockhash = (*BlockHash::from_str(&args.prev_start_blockhash)
+                        .expect("invalid blockhash"))
+                    .into();
                 }
             });
         }

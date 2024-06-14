@@ -1,6 +1,6 @@
 use bitcoin::hashes::sha256d;
 use candid::{CandidType, Principal};
-use ck_doge_types::canister::{*};
+use ck_doge_types::canister::*;
 use std::{collections::BTreeSet, str::FromStr};
 
 use crate::{is_authenticated, is_controller_or_manager, store, Account};
@@ -101,7 +101,7 @@ fn get_utx(id: String) -> Result<UnspentTx, String> {
 }
 
 #[ic_cdk::query]
-fn get_utx_b(txid: [u8; 32]) -> Option<UnspentTx> {
+fn get_utx_b(txid: ByteN<32>) -> Option<UnspentTx> {
     store::get_utx(&txid)
 }
 
@@ -119,7 +119,7 @@ fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, S
 }
 
 #[ic_cdk::query]
-fn list_utxos_b(address: [u8; 21], take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
+fn list_utxos_b(address: ByteN<21>, take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
     let utxos = store::list_utxos(&address, take.max(10).min(10000) as usize, confirmed);
     store::state::with(|s| {
         Ok(UtxosOutput {
@@ -137,6 +137,6 @@ fn get_balance(addr: String) -> Result<u64, String> {
 }
 
 #[ic_cdk::query]
-fn get_balance_b(address: [u8; 21]) -> u64 {
+fn get_balance_b(address: ByteN<21>) -> u64 {
     store::get_balance(&address)
 }

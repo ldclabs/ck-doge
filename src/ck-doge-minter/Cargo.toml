@@ -32,7 +32,7 @@ ic-cdk-timers = { workspace = true }
 ic-stable-structures = { workspace = true }
 lazy_static = { workspace = true }
 bitcoin = { workspace = true }
-ck-doge-types = { path = "../ck-doge-types", version = "0.3" }
+ck-doge-types = { path = "../ck-doge-types", version = "0.4" }
 getrandom = { version = "0.2", features = ["custom"] }
 ic-crypto-extended-bip32 = { git = "https://github.com/dfinity/ic/", rev = "d19fa446ab35780b2c6d8b82ea32d808cca558d5" }
 icrc-ledger-types = { git = "https://github.com/dfinity/ic/", rev = "d19fa446ab35780b2c6d8b82ea32d808cca558d5" }

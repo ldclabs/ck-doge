@@ -34,7 +34,7 @@ pub async fn fetch_block() {
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();
         let (tip_height, tip_blockhash) = store::state::with(|s| (s.tip_height, s.tip_blockhash));
-        let height = if tip_blockhash == [0u8; 32] {
+        let height = if *tip_blockhash == [0u8; 32] {
             0
         } else {
             tip_height + 1
