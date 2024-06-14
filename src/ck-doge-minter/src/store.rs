@@ -315,7 +315,7 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     let utxos = utxos
         .into_iter()
         .filter_map(|tx| {
-            let utxo = UtxoState(tx.height, tx.txid.0.into(), tx.vout, tx.value);
+            let utxo = UtxoState(tx.height, tx.txid.0, tx.vout, tx.value);
             if minted_utxos.0.contains_key(&utxo) {
                 None
             } else {
@@ -517,7 +517,7 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
         let mut m = r.borrow_mut();
         let mut total: u64 = 0;
         for utxo in res.utxos {
-            let utxo = UtxoState(utxo.height, utxo.txid.0.into(), utxo.vout, utxo.value);
+            let utxo = UtxoState(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
             if !m.contains_key(&utxo) {
                 total += utxo.3;
                 m.insert(utxo, (minter, 0, 0));

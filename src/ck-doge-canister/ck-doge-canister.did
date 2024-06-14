@@ -1,4 +1,4 @@
-type BlockRef = record { height : nat64; hash : text };
+type BlockRef = record { height : nat64; hash : blob };
 type ChainArgs = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 type CreateSignedTransactionInput = record {
   from_subaccount : opt blob;
@@ -73,6 +73,7 @@ type UtxosOutput = record {
   tip_height : nat64;
   confirmed_height : nat64;
   utxos : vec Utxo;
+  tip_blockhash : blob;
 };
 service : (opt ChainArgs) -> {
   admin_restart_syncing : (bool) -> (Result);

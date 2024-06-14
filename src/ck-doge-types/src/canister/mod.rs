@@ -157,7 +157,7 @@ pub struct UnspentTx {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct BlockRef {
-    pub hash: String,
+    pub hash: ByteN<32>,
     pub height: u64,
 }
 
@@ -197,6 +197,7 @@ pub struct CreateSignedTransactionOutput {
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct UtxosOutput {
     pub tip_height: u64,
+    pub tip_blockhash: ByteN<32>,
     pub confirmed_height: u64,
     pub utxos: Vec<Utxo>,
 }

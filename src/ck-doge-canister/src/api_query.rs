@@ -78,7 +78,7 @@ fn get_tip() -> Result<BlockRef, String> {
         }
 
         Ok(BlockRef {
-            hash: sha256d::Hash::from_bytes_ref(&s.tip_blockhash).to_string(),
+            hash: s.tip_blockhash,
             height: s.tip_height,
         })
     })
@@ -114,6 +114,7 @@ fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, S
             utxos,
             confirmed_height: s.confirmed_height,
             tip_height: s.tip_height,
+            tip_blockhash: s.tip_blockhash,
         })
     })
 }
@@ -126,6 +127,7 @@ fn list_utxos_b(address: ByteN<21>, take: u16, confirmed: bool) -> Result<UtxosO
             utxos,
             confirmed_height: s.confirmed_height,
             tip_height: s.tip_height,
+            tip_blockhash: s.tip_blockhash,
         })
     })
 }
