@@ -1,4 +1,4 @@
-use ck_doge_types::{canister::RPCAgent, jsonrpc::DogecoinRPC};
+use dogecoin::{canister::RPCAgent, jsonrpc::DogecoinRPC};
 use std::collections::BTreeMap;
 use std::time::Duration;
 

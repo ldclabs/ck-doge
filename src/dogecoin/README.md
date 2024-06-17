@@ -1,7 +1,5 @@
-# CK-Doge: `ck-doge-types`
+# CK-Doge: `dogecoin`
 General purpose rust library for using and interoperating with Dogecoin.
-
-**`ck-doge-types` has been renamed to `dogecoin`: https://crates.io/crates/dogecoin**
 
 [![crates.io](https://img.shields.io/crates/v/dogecoin.svg)](https://crates.io/crates/dogecoin)
 [![Documentation](https://docs.rs/dogecoin/badge.svg)](https://docs.rs/dogecoin)

@@ -1,6 +1,6 @@
 use bitcoin::hashes::sha256d;
 use candid::{CandidType, Principal};
-use ck_doge_types::canister::*;
+use dogecoin::canister::*;
 use std::{collections::BTreeSet, str::FromStr};
 
 use crate::{is_authenticated, is_controller_or_manager, store, Account};

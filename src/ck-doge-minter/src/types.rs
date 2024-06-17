@@ -1,5 +1,5 @@
 use candid::CandidType;
-use ck_doge_types::canister::*;
+use dogecoin::canister::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Clone, Debug, Default, Deserialize, Serialize)]

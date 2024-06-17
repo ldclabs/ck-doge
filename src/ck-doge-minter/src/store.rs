@@ -1,6 +1,6 @@
 use candid::Principal;
 use ciborium::{from_reader, into_writer};
-use ck_doge_types::{
+use dogecoin::{
     amount::{fee_by_size, DUST_LIMIT},
     canister,
     chainparams::{chain_from_key_bits, ChainParams, KeyBits},

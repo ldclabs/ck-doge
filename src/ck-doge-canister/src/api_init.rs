@@ -1,5 +1,5 @@
 use candid::CandidType;
-use ck_doge_types::block::BlockHash;
+use dogecoin::block::BlockHash;
 use serde::Deserialize;
 use std::{str::FromStr, time::Duration};
 

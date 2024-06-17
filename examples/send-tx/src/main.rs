@@ -1,9 +1,7 @@
 use async_trait::async_trait;
 use base64::Engine;
-use ck_doge_types::transaction::{OutPoint, Transaction, TxIn, TxOut, Txid};
-use ck_doge_types::{
-    chainparams::DOGE_TEST_NET_CHAIN, err_string, jsonrpc::*, script::*, sighash::*,
-};
+use dogecoin::transaction::{OutPoint, Transaction, TxIn, TxOut, Txid};
+use dogecoin::{chainparams::DOGE_TEST_NET_CHAIN, err_string, jsonrpc::*, script::*, sighash::*};
 use dotenvy::dotenv;
 use hex::test_hex_unwrap as hex;
 use reqwest::{header, Client, ClientBuilder, Url};

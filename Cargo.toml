@@ -2,7 +2,7 @@
 members = [
   "src/ck-doge-canister",
   "src/ck-doge-minter",
-  "src/ck-doge-types",
+  "src/dogecoin",
   "examples/check-blocks",
   "examples/send-tx",
 ]
@@ -15,7 +15,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.3.2"
+version = "0.4.0"
 edition = "2021"
 repository = "https://github.com/ldclabs/ck-doge"
 keywords = ["defi", "dogecoin", "icp", "dapp", "web3"]

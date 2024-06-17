@@ -1,5 +1,5 @@
 use candid::Principal;
-use ck_doge_types::canister;
+use dogecoin::canister;
 use std::collections::BTreeSet;
 use std::time::Duration;
 

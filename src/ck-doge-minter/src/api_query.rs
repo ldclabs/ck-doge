@@ -1,5 +1,5 @@
 use candid::{CandidType, Principal};
-use ck_doge_types::canister;
+use dogecoin::canister;
 use std::collections::BTreeSet;
 
 use crate::{

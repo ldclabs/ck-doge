@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use base64::Engine;
-use ck_doge_types::{block::*, err_string, jsonrpc::*};
+use dogecoin::{block::*, err_string, jsonrpc::*};
 use dotenvy::dotenv;
 use reqwest::{header, Client, ClientBuilder, Url};
 use std::str::FromStr;

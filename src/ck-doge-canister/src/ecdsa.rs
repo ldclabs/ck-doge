@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as base64_url, Engine};
 use ciborium::into_writer;
-use ck_doge_types::{canister::sha3_256, err_string};
+use dogecoin::{canister::sha3_256, err_string};
 use ic_cdk::api::management_canister::ecdsa;
 use ic_crypto_extended_bip32::{DerivationIndex, DerivationPath, ExtendedBip32DerivationOutput};
 use icrc_ledger_types::icrc1::account::Account;

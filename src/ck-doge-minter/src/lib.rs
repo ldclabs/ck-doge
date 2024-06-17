@@ -1,6 +1,6 @@
 use candid::{utils::ArgumentEncoder, Nat, Principal};
 use ciborium::into_writer;
-use ck_doge_types::canister;
+use dogecoin::canister;
 use num_traits::cast::ToPrimitive;
 use serde::Serialize;
 use std::collections::BTreeSet;

@@ -1,4 +1,4 @@
-use ck_doge_types::{
+use dogecoin::{
     amount, canister, err_string, jsonrpc::DogecoinRPC, script, sighash::*, transaction::*,
 };
 use serde_bytes::ByteBuf;

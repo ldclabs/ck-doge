@@ -1,7 +1,7 @@
 use bitcoin::hashes::sha256d;
 use candid::Principal;
 use ciborium::{from_reader, into_writer};
-use ck_doge_types::{
+use dogecoin::{
     block::{Block, BlockHash},
     canister::*,
     chainparams::{chain_from_key_bits, ChainParams, KeyBits},

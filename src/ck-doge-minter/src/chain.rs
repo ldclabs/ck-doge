@@ -1,5 +1,5 @@
 use candid::Principal;
-use ck_doge_types::{canister, transaction::Transaction};
+use dogecoin::{canister, transaction::Transaction};
 use serde_bytes::ByteBuf;
 
 use crate::call;

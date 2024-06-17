@@ -325,12 +325,12 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "check-blocks"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64 0.21.7",
  "bytes",
- "ck-doge-types",
+ "dogecoin",
  "dotenvy",
  "reqwest",
  "tokio",
@@ -378,14 +378,14 @@ dependencies = [
 
 [[package]]
 name = "ck-doge-canister"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "base64 0.21.7",
  "bitcoin",
  "bytes",
  "candid",
  "ciborium",
- "ck-doge-types",
+ "dogecoin",
  "getrandom",
  "hex-conservative",
  "ic-cdk 0.13.2",
@@ -404,14 +404,14 @@ dependencies = [
 
 [[package]]
 name = "ck-doge-minter"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "base64 0.21.7",
  "bitcoin",
  "bytes",
  "candid",
  "ciborium",
- "ck-doge-types",
+ "dogecoin",
  "getrandom",
  "hex-conservative",
  "ic-cdk 0.13.2",
@@ -426,28 +426,6 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sha3",
-]
-
-[[package]]
-name = "ck-doge-types"
-version = "0.3.2"
-dependencies = [
- "async-trait",
- "base64 0.21.7",
- "bitcoin",
- "bitcoin-io",
- "bytes",
- "candid",
- "ciborium",
- "dotenvy",
- "hex-conservative",
- "ic-cdk 0.13.2",
- "reqwest",
- "serde",
- "serde_bytes",
- "serde_json",
- "sha3",
- "tokio",
 ]
 
 [[package]]
@@ -667,6 +645,28 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.66",
+]
+
+[[package]]
+name = "dogecoin"
+version = "0.4.0"
+dependencies = [
+ "async-trait",
+ "base64 0.21.7",
+ "bitcoin",
+ "bitcoin-io",
+ "bytes",
+ "candid",
+ "ciborium",
+ "dotenvy",
+ "hex-conservative",
+ "ic-cdk 0.13.2",
+ "reqwest",
+ "serde",
+ "serde_bytes",
+ "serde_json",
+ "sha3",
+ "tokio",
 ]
 
 [[package]]
@@ -2252,12 +2252,12 @@ checksum = "61697e0a1c7e512e84a621326239844a24d8207b4669b41bc18b32ea5cbf988b"
 
 [[package]]
 name = "send-tx"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "async-trait",
  "base64 0.21.7",
  "bytes",
- "ck-doge-types",
+ "dogecoin",
  "dotenvy",
  "hex-conservative",
  "reqwest",

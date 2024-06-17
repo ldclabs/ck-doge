@@ -1,6 +1,6 @@
 use candid::Principal;
-use ck_doge_types::canister;
-use ck_doge_types::canister::*;
+use dogecoin::canister;
+use dogecoin::canister::*;
 use std::collections::BTreeSet;
 
 use crate::api_init::ChainArgs;
