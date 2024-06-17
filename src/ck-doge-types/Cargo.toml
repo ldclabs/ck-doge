@@ -1,6 +1,6 @@
 [package]
 name = "ck-doge-types"
-description = "General purpose rust library for using and interoperating with Dogecoin."
+description = "General purpose rust library for using and interoperating with Dogecoin. Renamed to `dogecoin`"
 publish = true
 
 version.workspace = true
