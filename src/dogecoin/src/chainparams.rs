@@ -14,7 +14,7 @@ pub struct ChainParams {
 }
 
 pub static DOGE_MAIN_NET_CHAIN: ChainParams = ChainParams {
-    chain_name: "doge_main",
+    chain_name: "main",
     genesis_block: "1a91e3dace36e2be3bf030a65679fe821aa1d6ef92e7c9902eb318182c355691",
     p2pkh_address_prefix: 0x1e,       // D
     p2sh_address_prefix: 0x16,        // 9 or A
@@ -26,7 +26,7 @@ pub static DOGE_MAIN_NET_CHAIN: ChainParams = ChainParams {
 };
 
 pub static DOGE_TEST_NET_CHAIN: ChainParams = ChainParams {
-    chain_name: "doge_test",
+    chain_name: "test",
     genesis_block: "bb0a78264637406b6360aad926284d544d7049f45189db5664f3c4d07350559e",
     p2pkh_address_prefix: 0x71,       // n
     p2sh_address_prefix: 0xc4,        // 2
@@ -38,7 +38,7 @@ pub static DOGE_TEST_NET_CHAIN: ChainParams = ChainParams {
 };
 
 pub static DOGE_REG_TEST_CHAIN: ChainParams = ChainParams {
-    chain_name: "doge_regtest",
+    chain_name: "regtest",
     genesis_block: "3d2160a3b5dc4a9d62e7e66a295f70313ac808440ef7400d6c0772171ce973a5",
     p2pkh_address_prefix: 0x6f,       // n
     p2sh_address_prefix: 0xc4,        // 2

@@ -32,7 +32,7 @@ pub struct State {
 
 #[ic_cdk::query]
 fn get_state() -> Result<State, ()> {
-    Ok(store::state::with(|s| {
+    store::state::with(|s| {
         let mut res = State {
             chain: s.chain_params().chain_name.to_string(),
             tokens_minted: s.tokens_minted,
@@ -55,8 +55,8 @@ fn get_state() -> Result<State, ()> {
                 .map(|v| v.to_string())
                 .ok();
         }
-        res
-    }))
+        Ok(res)
+    })
 }
 
 #[ic_cdk::query]

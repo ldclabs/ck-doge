@@ -15,7 +15,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 repository = "https://github.com/ldclabs/ck-doge"
 keywords = ["defi", "dogecoin", "icp", "dapp", "web3"]
@@ -39,7 +39,7 @@ hex = { package = "hex-conservative", version = "0.2", default-features = false,
 ] }
 async-trait = "0.1"
 candid = "0.10"
-ic-cdk = "0.13"
+ic-cdk = "0.14"
 ic-cdk-timers = "0.8"
 ic-stable-structures = "0.6"
 num-traits = "0.2"

@@ -11,15 +11,13 @@ impl Chain {
         Self(principal)
     }
 
-    pub async fn send_signed_transaction(
-        &self,
-        tx: &Transaction,
-    ) -> Result<canister::SendSignedTransactionOutput, String> {
+    pub async fn send_tx(&self, tx: &Transaction) -> Result<canister::SendTxOutput, String> {
         call(
             self.0,
-            "send_signed_transaction",
-            (canister::SendSignedTransactionInput {
+            "send_tx",
+            (canister::SendTxInput {
                 tx: ByteBuf::from(tx.to_bytes()),
+                from_subaccount: None,
             },),
         )
         .await?

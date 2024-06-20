@@ -378,7 +378,7 @@ pub async fn burn_ckdoge(
     address: String,
     amount: u64,
     fee_rate: u64,
-) -> Result<canister::SendSignedTransactionOutput, String> {
+) -> Result<canister::SendTxOutput, String> {
     if amount < DUST_LIMIT * 10 {
         return Err("amount is too small".to_string());
     }
@@ -556,7 +556,7 @@ async fn burn_utxos(
     amount: u64,
     fee_rate: u64,
     utxos: Vec<(UtxoState, Principal)>,
-) -> Result<canister::SendSignedTransactionOutput, String> {
+) -> Result<canister::SendTxOutput, String> {
     let (chain_params, key_name, ecdsa_public_key) = state::with(|s| {
         (
             s.chain_params(),
@@ -619,9 +619,7 @@ async fn burn_utxos(
             .map_err(err_string)?;
     }
 
-    let res = chain
-        .send_signed_transaction(sighasher.transaction())
-        .await?;
+    let res = chain.send_tx(sighasher.transaction()).await?;
 
     COLLECTED_UTXOS.with(|r| {
         let mut m = r.borrow_mut();

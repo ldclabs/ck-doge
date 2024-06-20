@@ -168,28 +168,31 @@ pub fn sha3_256(data: &[u8]) -> [u8; 32] {
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct SendSignedTransactionInput {
-    pub tx: ByteBuf,
+pub struct SendTxInput {
+    pub tx: ByteBuf,                        // signed or unsigned transaction
+    pub from_subaccount: Option<ByteN<32>>, // should be None for signed transaction
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct SendSignedTransactionOutput {
+pub struct SendTxOutput {
     pub txid: Txid,
     pub tip_height: u64,
     pub instructions: u64,
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct CreateSignedTransactionInput {
+pub struct CreateTxInput {
     pub address: String,
     pub amount: u64,
     pub fee_rate: u64, // units per vByte, should >= 1000
     pub from_subaccount: Option<ByteN<32>>,
+    pub utxos: Vec<Utxo>, // optional, if not provided, will fetch from the UTXOs indexer
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
-pub struct CreateSignedTransactionOutput {
-    pub tx: ByteBuf,
+pub struct CreateTxOutput {
+    pub tx: ByteBuf, // unsigned transaction
+    pub fee: u64,
     pub tip_height: u64,
     pub instructions: u64,
 }

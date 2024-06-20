@@ -37,7 +37,7 @@ pub struct State {
 
 #[ic_cdk::query]
 fn get_state() -> Result<State, ()> {
-    Ok(store::state::with(|s| {
+    store::state::with(|s| {
         let mut res = State {
             chain: s.chain_params().chain_name.to_string(),
             min_confirmations: s.min_confirmations,
@@ -66,8 +66,8 @@ fn get_state() -> Result<State, ()> {
                 res.syncing_status = Some(s.status);
             });
         }
-        res
-    }))
+        Ok(res)
+    })
 }
 
 #[ic_cdk::query]
@@ -108,7 +108,7 @@ fn get_utx_b(txid: ByteN<32>) -> Option<UnspentTx> {
 #[ic_cdk::query]
 fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
     let address = Address::from_str(&addr)?;
-    let utxos = store::list_utxos(&address.0, take.max(10).min(10000) as usize, confirmed);
+    let utxos = store::list_utxos(&address.0, take.clamp(10, 10000) as usize, confirmed);
     store::state::with(|s| {
         Ok(UtxosOutput {
             utxos,
@@ -121,7 +121,7 @@ fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, S
 
 #[ic_cdk::query]
 fn list_utxos_b(address: ByteN<21>, take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
-    let utxos = store::list_utxos(&address, take.max(10).min(10000) as usize, confirmed);
+    let utxos = store::list_utxos(&address, take.clamp(10, 10000) as usize, confirmed);
     store::state::with(|s| {
         Ok(UtxosOutput {
             utxos,

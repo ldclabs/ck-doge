@@ -65,8 +65,8 @@ dfx canister call b77ix-eeaaa-aaaaa-qaada-cai icrc2_approve '(record {spender=re
 
 # burn ckDOGE
 dfx canister call ck-doge-minter burn_ckdoge '(record {
-  address = "nYmJMro1rtZvHWm5a4WxTE77bGYtRYrfao";
-  amount = 10_000_000;
+  address = "nehsFf3XXG7PfFCJoUcgTkCE9xRMR8XQaF";
+  amount = 200_000_000;
   fee_rate = 1000;
 })'
 
