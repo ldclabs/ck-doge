@@ -44,9 +44,18 @@ async fn admin_set_agent(agents: Vec<canister::RPCAgent>) -> Result<(), String> 
 }
 
 #[ic_cdk::update(guard = "is_controller_or_manager")]
-async fn admin_restart_syncing(force: bool) -> Result<(), String> {
+async fn admin_restart_syncing(for_status: Option<i8>) -> Result<(), String> {
     store::syncing::with_mut(|s| {
-        match s.status {
+        let status = if let Some(status) = for_status {
+            if let Some(timer) = s.timer {
+                ic_cdk_timers::clear_timer(timer);
+            }
+            status
+        } else {
+            s.status
+        };
+
+        match status {
             0 | -1 => {
                 s.status = 0;
                 s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
@@ -67,22 +76,12 @@ async fn admin_restart_syncing(force: bool) -> Result<(), String> {
                     ic_cdk::spawn(syncing::fetch_block())
                 }));
             }
-            _ if force => {
-                if let Some(timer) = s.timer {
-                    ic_cdk_timers::clear_timer(timer);
-                }
-                s.status = 0;
-                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-                    ic_cdk::spawn(syncing::fetch_block())
-                }));
-            }
             status => {
-                return Err(format!(
-                    "sync job is already running, currently at {}",
-                    status
-                ));
+                return Err(format!("invalid status {}", status));
             }
         }
         Ok(())
-    })
+    })?;
+    syncing::refresh_proxy_token().await;
+    Ok(())
 }

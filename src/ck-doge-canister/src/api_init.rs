@@ -80,7 +80,10 @@ fn post_upgrade(args: Option<ChainArgs>) {
 
     store::syncing::with_mut(|s| {
         s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
-            ic_cdk::spawn(syncing::fetch_block())
+            ic_cdk::spawn(async {
+                syncing::refresh_proxy_token().await;
+                syncing::fetch_block().await;
+            })
         }));
 
         s.refresh_proxy_token_timer = Some(ic_cdk_timers::set_timer_interval(

@@ -53,7 +53,7 @@ dfx canister call ck-doge-canister admin_set_agent '
 dfx canister call ck-doge-canister get_state '()'
 
 # start sync jobs to sync Dogecoin blocks and process transactions
-dfx canister call ck-doge-canister admin_restart_syncing '(false)'
+dfx canister call ck-doge-canister admin_restart_syncing '(null)'
 
 dfx canister call ck-doge-canister get_tip '()'
 

@@ -248,6 +248,19 @@ impl<const N: usize> From<[u8; N]> for ByteN<N> {
     }
 }
 
+impl<const N: usize> TryFrom<&[u8]> for ByteN<N> {
+    type Error = String;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != N {
+            return Err(format!("expected {} bytes, got {}", N, value.len()));
+        }
+        let mut bytes = [0u8; N];
+        bytes.copy_from_slice(value);
+        Ok(Self(ByteArray::new(bytes)))
+    }
+}
+
 impl<const N: usize> From<ByteArray<N>> for ByteN<N> {
     fn from(val: ByteArray<N>) -> Self {
         Self(val)

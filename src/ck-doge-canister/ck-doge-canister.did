@@ -78,7 +78,7 @@ type UtxosOutput = record {
   tip_blockhash : blob;
 };
 service : (opt ChainArgs) -> {
-  admin_restart_syncing : (bool) -> (Result);
+  admin_restart_syncing : (opt int8) -> (Result);
   admin_set_agent : (vec RPCAgent) -> (Result);
   admin_set_managers : (vec principal) -> (Result);
   api_version : () -> (nat16) query;

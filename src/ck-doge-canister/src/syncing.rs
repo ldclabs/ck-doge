@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use crate::{ecdsa, store, SECONDS};
 
-pub const REFRESH_PROXY_TOKEN_INTERVAL: u64 = 60 * 5; // 5 minute
+pub const REFRESH_PROXY_TOKEN_INTERVAL: u64 = 60 * 60; // 60 minutes
 const FETCH_BLOCK_AFTER: u64 = 20; // 20 seconds
 
 pub async fn refresh_proxy_token() {
@@ -80,7 +80,7 @@ pub async fn fetch_block() {
         Err(FetchBlockError::Other(err)) => {
             store::state::with_mut(|s| s.append_error(err.clone()));
             store::syncing::with_mut(|s| s.status = -1);
-            ic_cdk::trap(&err);
+            ic_cdk::println!("FetchBlockError: {}", err);
         }
         Err(FetchBlockError::ShouldWait(err)) => {
             store::state::with_mut(|s| s.append_error(err.clone()));
