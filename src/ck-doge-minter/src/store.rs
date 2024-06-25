@@ -192,6 +192,7 @@ const BURNED_UTXOS_MEMORY_ID: MemoryId = MemoryId::new(3);
 
 thread_local! {
     static STATE_HEAP: RefCell<State> = RefCell::new(State::default());
+    static COLLECTED_UTXOS_HEAP: RefCell<BTreeMap<UtxoState, (Principal, u64, u64)>> = RefCell::new(BTreeMap::new());
 
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
@@ -210,10 +211,11 @@ thread_local! {
         )
     );
 
-    static COLLECTED_UTXOS: RefCell<StableBTreeMap<UtxoState, (Principal, u64, u64), Memory>> = RefCell::new(
-        StableBTreeMap::init(
+    static COLLECTED_UTXOS: RefCell<StableCell<Vec<u8>, Memory>> = RefCell::new(
+        StableCell::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(COLLECTED_UTXOS_MEMORY_ID)),
-        )
+            Vec::new()
+        ).expect("failed to init COLLECTED_UTXOS store")
     );
 
     static BURNED_UTXOS: RefCell<StableBTreeMap<u64, BurnedUtxo, Memory>> = RefCell::new(
@@ -235,7 +237,7 @@ pub mod state {
     }
 
     pub fn get_collected_utxos_len() -> u64 {
-        COLLECTED_UTXOS.with(|r| r.borrow().len())
+        COLLECTED_UTXOS_HEAP.with(|r| r.borrow().len() as u64)
     }
 
     pub fn get_burned_utxos_len() -> u64 {
@@ -273,10 +275,16 @@ pub mod state {
 
     pub fn load() {
         STATE.with(|r| {
-            let s = r.borrow_mut().get().clone();
             STATE_HEAP.with(|h| {
-                *h.borrow_mut() = s;
-                // let mut s = h.borrow_mut();
+                *h.borrow_mut() = r.borrow().get().clone();
+            });
+        });
+        COLLECTED_UTXOS.with(|r| {
+            COLLECTED_UTXOS_HEAP.with(|h| {
+                let v: BTreeMap<UtxoState, (Principal, u64, u64)> =
+                    from_reader(&r.borrow().get()[..])
+                        .expect("failed to decode COLLECTED_UTXOS data");
+                *h.borrow_mut() = v;
             });
         });
     }
@@ -287,6 +295,16 @@ pub mod state {
                 r.borrow_mut()
                     .set(h.borrow().clone())
                     .expect("failed to set STATE data");
+            });
+        });
+        COLLECTED_UTXOS_HEAP.with(|h| {
+            COLLECTED_UTXOS.with(|r| {
+                let mut buf = vec![];
+                into_writer(&(*h.borrow()), &mut buf)
+                    .expect("failed to encode COLLECTED_UTXOS data");
+                r.borrow_mut()
+                    .set(buf)
+                    .expect("failed to set COLLECTED_UTXOS data");
             });
         });
     }
@@ -348,7 +366,7 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
             MINTED_UTXOS.with(|r| {
                 r.borrow_mut().insert(caller, minted_utxos.clone());
             });
-            COLLECTED_UTXOS.with(|r| {
+            COLLECTED_UTXOS_HEAP.with(|r| {
                 r.borrow_mut().insert(tx, (caller, 0, 0));
             });
         }
@@ -402,14 +420,14 @@ pub async fn burn_ckdoge(
         ));
     }
 
-    let (utxos, total) = COLLECTED_UTXOS.with(|r| {
+    let (utxos, total) = COLLECTED_UTXOS_HEAP.with(|r| {
         let m = r.borrow();
         let mut total: u64 = 0;
         let mut utxos: Vec<(UtxoState, Principal)> = vec![];
         for (utxo, v) in m.iter() {
             if v.1 == 0 {
                 total += utxo.3;
-                utxos.push((utxo, v.0));
+                utxos.push((utxo.clone(), v.0));
                 if (utxos.len() >= MIN_RETRIEVE_BATCH_SIZE && total >= amount)
                     || utxos.len() >= MAX_RETRIEVE_BATCH_SIZE
                 {
@@ -439,7 +457,7 @@ pub async fn burn_ckdoge(
         s.tokens_burned = s.tokens_burned.saturating_add(amount);
     });
 
-    COLLECTED_UTXOS.with(|r| {
+    COLLECTED_UTXOS_HEAP.with(|r| {
         let mut m = r.borrow_mut();
         // mark utxos as used
         for utxo in utxos.iter() {
@@ -474,12 +492,12 @@ pub async fn retry_burn_utxos() {
             "retry burn utxos after 30 seconds, block index: {blk}, receiver: {receiver:?}, amount: {amount}"
         ));
 
-        let utxos = COLLECTED_UTXOS.with(|r| {
+        let utxos = COLLECTED_UTXOS_HEAP.with(|r| {
             let m = r.borrow();
             let mut utxos: Vec<(UtxoState, Principal)> = vec![];
             for (utxo, v) in m.iter() {
                 if v.1 == blk && v.2 == 0 {
-                    utxos.push((utxo, v.0));
+                    utxos.push((utxo.clone(), v.0));
                 }
             }
             utxos
@@ -515,7 +533,7 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
     }
 
     let confirmed_height = res.confirmed_height;
-    COLLECTED_UTXOS.with(|r| {
+    COLLECTED_UTXOS_HEAP.with(|r| {
         let mut m = r.borrow_mut();
         let mut total: u64 = 0;
         for utxo in res.utxos {
@@ -526,18 +544,8 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
             }
         }
 
-        let mut remove_utxos = vec![];
-        for (utxo, v) in m.iter() {
-            if v.2 > 0 && v.2 < confirmed_height {
-                remove_utxos.push(utxo);
-            }
-        }
-
         // remove retrieved utxos in previous burned
-        for utxo in remove_utxos {
-            m.remove(&utxo);
-        }
-
+        m.retain(|_, v| v.2 == 0 || v.2 >= confirmed_height);
         Ok(total)
     })
 }
@@ -620,10 +628,11 @@ async fn burn_utxos(
 
     let res = chain.send_tx(sighasher.transaction()).await?;
 
-    COLLECTED_UTXOS.with(|r| {
+    COLLECTED_UTXOS_HEAP.with(|r| {
         let mut m = r.borrow_mut();
         // mark utxos as burned
         for utxo in utxos.iter() {
+            // TODO: use spent height
             m.insert(utxo.0.clone(), (utxo.1, block_index, res.tip_height));
         }
     });
