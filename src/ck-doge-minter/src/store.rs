@@ -596,7 +596,6 @@ async fn burn_utxos(
 
     let fee = fee_by_size(send_tx.estimate_size() as u64, fee_rate);
     send_tx.output[0].value = amount.saturating_sub(fee);
-    send_tx.output[1].value = total.saturating_sub(amount);
     if send_tx.output[1].value <= DUST_LIMIT {
         send_tx.output.pop();
     }

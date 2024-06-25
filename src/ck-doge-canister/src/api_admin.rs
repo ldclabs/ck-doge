@@ -82,6 +82,7 @@ async fn admin_restart_syncing(for_status: Option<i8>) -> Result<(), String> {
         }
         Ok(())
     })?;
+
     syncing::refresh_proxy_token().await;
     Ok(())
 }

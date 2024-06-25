@@ -78,12 +78,12 @@ pub async fn fetch_block() {
 
     match res {
         Err(FetchBlockError::Other(err)) => {
-            store::state::with_mut(|s| s.append_error(err.clone()));
+            ic_cdk::println!("fetch_block error: {}", err);
+            store::state::with_mut(|s| s.append_error(err));
             store::syncing::with_mut(|s| s.status = -1);
-            ic_cdk::println!("FetchBlockError: {}", err);
         }
         Err(FetchBlockError::ShouldWait(err)) => {
-            store::state::with_mut(|s| s.append_error(err.clone()));
+            store::state::with_mut(|s| s.append_error(err));
             store::syncing::with_mut(|s| {
                 s.timer = Some(ic_cdk_timers::set_timer(
                     Duration::from_secs(FETCH_BLOCK_AFTER),
@@ -107,9 +107,9 @@ fn process_block() {
     store::syncing::with_mut(|s| s.status = 2);
     match store::process_block() {
         Err(err) => {
+            ic_cdk::println!("process_block error: {}", err);
             store::syncing::with_mut(|s| s.status = -2);
-            store::state::with_mut(|s| s.append_error(err.clone()));
-            ic_cdk::trap(&err);
+            store::state::with_mut(|s| s.append_error(err));
         }
         Ok(res) => {
             store::syncing::with_mut(|s| {
@@ -130,9 +130,9 @@ fn confirm_utxos() {
     store::syncing::with_mut(|s| s.status = 3);
     match store::confirm_utxos() {
         Err(err) => {
+            ic_cdk::println!("confirm_utxos error: {}", err);
             store::syncing::with_mut(|s| s.status = -3);
-            store::state::with_mut(|s| s.append_error(err.clone()));
-            ic_cdk::trap(&err);
+            store::state::with_mut(|s| s.append_error(err));
         }
         Ok(res) => {
             store::syncing::with_mut(|s| {
