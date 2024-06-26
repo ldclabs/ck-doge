@@ -37,11 +37,11 @@ pub async fn update_proxy_token(ecdsa_key_name: String, mut rpc_agents: Vec<RPCA
 
 enum FetchBlockError {
     ShouldWait(String),
+    Reorg(String),
     Other(String),
 }
 
 pub async fn fetch_block() {
-    store::state::with_mut(|s| s.last_errors.clear());
     store::syncing::with_mut(|s| s.status = 1);
     let res: Result<(), FetchBlockError> = async {
         let agent = store::state::get_agent();
@@ -59,7 +59,7 @@ pub async fn fetch_block() {
         let block = DogecoinRPC::get_block(&agent, blockhash.to_string(), &blockhash)
             .await
             .map_err(FetchBlockError::Other)?;
-        store::append_block(height, blockhash, block).map_err(FetchBlockError::Other)?;
+        store::append_block(height, blockhash, block).map_err(FetchBlockError::Reorg)?;
 
         for attester in store::state::get_attest_agents() {
             let hash = DogecoinRPC::get_blockhash(&attester, key.clone(), height)
@@ -81,6 +81,17 @@ pub async fn fetch_block() {
             ic_cdk::println!("fetch_block error: {}", err);
             store::state::with_mut(|s| s.append_error(err));
             store::syncing::with_mut(|s| s.status = -1);
+        }
+        Err(FetchBlockError::Reorg(err)) => {
+            ic_cdk::println!("fetch_block Reorg error: {}", err);
+            store::state::with_mut(|s| s.append_error(err));
+
+            store::clear_for_restart_confirm_utxos();
+            store::syncing::with_mut(|s| {
+                s.timer = Some(ic_cdk_timers::set_timer(Duration::from_secs(0), || {
+                    ic_cdk::spawn(fetch_block())
+                }));
+            });
         }
         Err(FetchBlockError::ShouldWait(err)) => {
             store::state::with_mut(|s| s.append_error(err));

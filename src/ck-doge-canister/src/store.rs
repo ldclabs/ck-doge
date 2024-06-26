@@ -354,7 +354,7 @@ pub fn append_block(height: u64, hash: BlockHash, block: Block) -> Result<(), St
             return Err(format!(
                 "invalid prev_blockhash at {}, expected {:?}, got {:?}",
                 height,
-                sha256d::Hash::from_bytes_ref(&s.tip_blockhash),
+                BlockHash::from(*s.tip_blockhash),
                 block.header.prev_blockhash,
             ));
         }

@@ -28,6 +28,12 @@ impl Deref for BlockHash {
     }
 }
 
+impl From<[u8; 32]> for BlockHash {
+    fn from(data: [u8; 32]) -> BlockHash {
+        BlockHash(sha256d::Hash::from_byte_array(data))
+    }
+}
+
 impl Encodable for BlockHash {
     fn consensus_encode<W: Write + ?Sized>(&self, w: &mut W) -> Result<usize, Error> {
         let mut len = 0;
