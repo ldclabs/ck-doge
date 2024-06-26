@@ -211,14 +211,14 @@ thread_local! {
     );
 
     // txid -> unspent tx
-    static UT: RefCell<StableBTreeMap<[u8; 32], UnspentTxState, Memory>> = RefCell::new(
+    static UTXS: RefCell<StableBTreeMap<[u8; 32], UnspentTxState, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(UT_MEMORY_ID)),
         )
     );
 
     // address -> unspent output
-    static XO: RefCell<StableBTreeMap<[u8; 21], UtxoStates, Memory>> = RefCell::new(
+    static UTXOS: RefCell<StableBTreeMap<[u8; 21], UtxoStates, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(XO_MEMORY_ID)),
         )
@@ -263,11 +263,11 @@ pub mod state {
     }
 
     pub fn get_confirmed_utxs_len() -> u64 {
-        UT.with(|r| r.borrow().len())
+        UTXS.with(|r| r.borrow().len())
     }
 
     pub fn get_confirmed_utxos_len() -> u64 {
-        XO.with(|r| r.borrow().len())
+        UTXOS.with(|r| r.borrow().len())
     }
 
     pub fn with<R>(f: impl FnOnce(&State) -> R) -> R {
@@ -400,7 +400,7 @@ pub fn process_block() -> Result<bool, String> {
                     }
 
                     let chain = chain_from_key_bits(s.chain);
-                    UT.with(|utr| {
+                    UTXS.with(|utr| {
                         let utm = utr.borrow();
 
                         for tx in block.txdata.iter().skip(1) {
@@ -482,8 +482,8 @@ pub fn confirm_utxos() -> Result<bool, String> {
         let confirmed_blockhash = confirmed_blockhash
             .ok_or_else(|| format!("no processed blockhash at height {}", confirmed_height))?;
 
-        UT.with(|utr| {
-            XO.with(|xor| {
+        UTXS.with(|utr| {
+            UTXOS.with(|xor| {
                 flush_confirmed_utxos(
                     &mut s.unconfirmed_utxs,
                     &mut s.unconfirmed_utxos,
@@ -502,12 +502,12 @@ pub fn confirm_utxos() -> Result<bool, String> {
 pub fn get_utx(txid: &ByteN<32>) -> Option<UnspentTx> {
     state::with(|s| match s.unconfirmed_utxs.get(txid) {
         Some(utx) => Some(UnspentTx::from(utx.clone())),
-        None => UT.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
+        None => UTXS.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
     })
 }
 
 pub fn get_balance(addr: &ByteN<21>) -> u64 {
-    let mut res = XO.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
+    let mut res = UTXOS.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     state::with(|s| {
         if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
             for tx in sts.0.keys() {
@@ -520,7 +520,7 @@ pub fn get_balance(addr: &ByteN<21>) -> u64 {
 }
 
 pub fn list_utxos(addr: &ByteN<21>, take: usize, confirmed: bool) -> Vec<Utxo> {
-    let mut res = XO.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
+    let mut res = UTXOS.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     if !confirmed {
         state::with(|s| {
             if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
