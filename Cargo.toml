@@ -19,7 +19,7 @@ version = "0.5.1"
 edition = "2021"
 repository = "https://github.com/ldclabs/ck-doge"
 keywords = ["defi", "dogecoin", "icp", "dapp", "web3"]
-categories = ["blockchain", "web3"]
+categories = ["encoding", "wasm", "data-structures"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
