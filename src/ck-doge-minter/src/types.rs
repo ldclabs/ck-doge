@@ -1,12 +1,29 @@
-use candid::CandidType;
+use candid::{CandidType, Principal};
 use dogecoin::canister::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(CandidType, Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
 pub struct MintedUtxo {
     pub block_index: u64,
     pub minted_at: u64, // timestamp in milliseconds
     pub utxo: Utxo,
+}
+
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+pub struct CollectedUtxo {
+    pub principal: Principal,
+    pub block_index: u64,
+    pub height: u64,
+    pub utxo: Utxo,
+}
+
+#[derive(CandidType, Clone, Debug, Deserialize, Serialize)]
+pub struct BurnedUtxos {
+    pub block_index: u64,
+    pub txid: Txid,
+    pub height: u64,
+    pub address: Address,
+    pub utxos: Vec<Utxo>,
 }
 
 pub type MintMemo = OutPoint;

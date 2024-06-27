@@ -59,14 +59,24 @@ fn get_state() -> Result<State, ()> {
     })
 }
 
+#[ic_cdk::query(guard = "is_authenticated")]
+fn get_address() -> Result<String, String> {
+    let addr = store::get_address(&user_account(&ic_cdk::caller()))?;
+    Ok(addr.to_string())
+}
+
 #[ic_cdk::query]
 fn list_minted_utxos(principal: Option<Principal>) -> Result<Vec<types::MintedUtxo>, String> {
     let principal = principal.unwrap_or(ic_cdk::caller());
     Ok(store::list_minted_utxos(principal))
 }
 
-#[ic_cdk::query(guard = "is_authenticated")]
-fn get_address() -> Result<String, String> {
-    let addr = store::get_address(&user_account(&ic_cdk::caller()))?;
-    Ok(addr.to_string())
+#[ic_cdk::query]
+fn list_collected_utxos(start: u64, take: u16) -> Vec<types::CollectedUtxo> {
+    store::list_collected_utxos(start, take.clamp(1, 1000) as usize)
+}
+
+#[ic_cdk::query]
+fn list_burned_utxos(start: u64, take: u16) -> Vec<types::BurnedUtxos> {
+    store::list_burned_utxos(start, take.clamp(1, 1000) as usize)
 }

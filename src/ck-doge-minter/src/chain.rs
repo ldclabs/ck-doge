@@ -23,6 +23,10 @@ impl Chain {
         .await?
     }
 
+    pub async fn get_tx_block_height(&self, txid: &canister::Txid) -> Result<Option<u64>, String> {
+        call(self.0, "get_tx_block_height", (*txid.0,)).await
+    }
+
     pub async fn list_utxos(
         &self,
         address: &canister::Address,

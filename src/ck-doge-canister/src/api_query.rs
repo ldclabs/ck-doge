@@ -106,6 +106,11 @@ fn get_utx_b(txid: ByteN<32>) -> Option<UnspentTx> {
 }
 
 #[ic_cdk::query]
+fn get_tx_block_height(txid: ByteN<32>) -> Option<u64> {
+    store::get_tx_block_height(&txid)
+}
+
+#[ic_cdk::query]
 fn list_utxos(addr: String, take: u16, confirmed: bool) -> Result<UtxosOutput, String> {
     let address = Address::from_str(&addr)?;
     let utxos = store::list_utxos(&address.0, take.clamp(10, 10000) as usize, confirmed);

@@ -1,4 +1,3 @@
-use bitcoin::hashes::sha256d;
 use candid::Principal;
 use ciborium::{from_reader, into_writer};
 use dogecoin::{
@@ -503,6 +502,13 @@ pub fn get_utx(txid: &ByteN<32>) -> Option<UnspentTx> {
     state::with(|s| match s.unconfirmed_utxs.get(txid) {
         Some(utx) => Some(UnspentTx::from(utx.clone())),
         None => UTXS.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
+    })
+}
+
+pub fn get_tx_block_height(txid: &ByteN<32>) -> Option<u64> {
+    state::with(|s| match s.unconfirmed_utxs.get(txid) {
+        Some(utx) => Some(utx.0),
+        None => UTXS.with(|r| r.borrow().get(txid).map(|utx| utx.0)),
     })
 }
 

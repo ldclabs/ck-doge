@@ -88,6 +88,7 @@ service : (opt ChainArgs) -> {
   get_balance_b : (blob) -> (nat64) query;
   get_state : () -> (Result_4) query;
   get_tip : () -> (Result_5) query;
+  get_tx_block_height : (blob) -> (opt nat64) query;
   get_utx : (text) -> (Result_6) query;
   get_utx_b : (blob) -> (opt UnspentTx) query;
   list_utxos : (text, nat16, bool) -> (Result_7) query;

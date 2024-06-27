@@ -21,6 +21,7 @@ use std::{
     borrow::Cow,
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
+    ops,
     time::Duration,
 };
 
@@ -57,9 +58,13 @@ pub struct State {
 
     pub managers: BTreeSet<Principal>,
 
-    // (block_index, receiver, amount, fee_rate, retry)
+    // VecDeque<(block_index, receiver, amount, fee_rate, retry)>
     #[serde(default)]
     pub utxos_retry_burning_queue: VecDeque<(u64, canister::Address, u64, u64, u8)>,
+
+    // VecDeque<(block_index, timestamp_ms)>
+    #[serde(default)]
+    pub unconfirmed_burning_utxos: VecDeque<(u64, u64)>,
 }
 
 impl State {
@@ -106,6 +111,17 @@ impl Storable for State {
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UtxoState(pub u64, pub canister::ByteN<32>, pub u32, pub u64);
 
+impl From<UtxoState> for canister::Utxo {
+    fn from(utxo: UtxoState) -> Self {
+        canister::Utxo {
+            height: utxo.0,
+            txid: utxo.1.into(),
+            vout: utxo.2,
+            value: utxo.3,
+        }
+    }
+}
+
 impl Storable for UtxoState {
     const BOUND: Bound = Bound::Bounded {
         max_size: 58,
@@ -135,12 +151,7 @@ impl From<MintedUtxos> for Vec<types::MintedUtxo> {
             .map(|(k, v)| types::MintedUtxo {
                 block_index: v.0,
                 minted_at: v.1,
-                utxo: canister::Utxo {
-                    height: k.0,
-                    txid: k.1.into(),
-                    vout: k.2,
-                    value: k.3,
-                },
+                utxo: k.into(),
             })
             .collect()
     }
@@ -162,7 +173,7 @@ impl Storable for MintedUtxos {
 
 // block_index -> BurnedUtxo
 #[derive(Clone, Default, Deserialize, Serialize)]
-pub struct BurnedUtxo(
+pub struct BurnedUtxos(
     (
         Vec<(UtxoState, Principal)>,
         canister::Address,
@@ -171,17 +182,17 @@ pub struct BurnedUtxo(
     ),
 );
 
-impl Storable for BurnedUtxo {
+impl Storable for BurnedUtxos {
     const BOUND: Bound = Bound::Unbounded;
 
     fn to_bytes(&self) -> Cow<[u8]> {
         let mut buf = vec![];
-        into_writer(self, &mut buf).expect("failed to encode BurnedUtxo data");
+        into_writer(self, &mut buf).expect("failed to encode BurnedUtxos data");
         Cow::Owned(buf)
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> Self {
-        from_reader(&bytes[..]).expect("failed to decode BurnedUtxo data")
+        from_reader(&bytes[..]).expect("failed to decode BurnedUtxos data")
     }
 }
 
@@ -192,7 +203,7 @@ const BURNED_UTXOS_MEMORY_ID: MemoryId = MemoryId::new(3);
 
 thread_local! {
     static STATE_HEAP: RefCell<State> = RefCell::new(State::default());
-    static COLLECTED_UTXOS_HEAP: RefCell<BTreeMap<UtxoState, (Principal, u64, u64)>> = RefCell::new(BTreeMap::new());
+    static COLLECTED_UTXOS_HEAP: RefCell<BTreeMap<UtxoState, (Principal, u64, u64)>> = const { RefCell::new(BTreeMap::new()) };
 
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
@@ -218,7 +229,7 @@ thread_local! {
         ).expect("failed to init COLLECTED_UTXOS store")
     );
 
-    static BURNED_UTXOS: RefCell<StableBTreeMap<u64, BurnedUtxo, Memory>> = RefCell::new(
+    static BURNED_UTXOS: RefCell<StableBTreeMap<u64, BurnedUtxos, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with_borrow(|m| m.get(BURNED_UTXOS_MEMORY_ID)),
         )
@@ -388,7 +399,6 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     }
 }
 
-const MIN_RETRIEVE_BATCH_SIZE: usize = 10;
 const MAX_RETRIEVE_BATCH_SIZE: usize = 100;
 
 pub async fn burn_ckdoge(
@@ -422,13 +432,14 @@ pub async fn burn_ckdoge(
 
     let (utxos, total) = COLLECTED_UTXOS_HEAP.with(|r| {
         let m = r.borrow();
+        let batch_size = (m.len() / 200).max(1);
         let mut total: u64 = 0;
         let mut utxos: Vec<(UtxoState, Principal)> = vec![];
         for (utxo, v) in m.iter() {
             if v.1 == 0 {
                 total += utxo.3;
                 utxos.push((utxo.clone(), v.0));
-                if (utxos.len() >= MIN_RETRIEVE_BATCH_SIZE && total >= amount)
+                if (utxos.len() >= batch_size && total >= amount)
                     || utxos.len() >= MAX_RETRIEVE_BATCH_SIZE
                 {
                     break;
@@ -449,7 +460,7 @@ pub async fn burn_ckdoge(
     let memo = to_cbor_bytes(&types::BurnMemo {
         address: receiver.clone().into(),
     });
-    let blk = ledger
+    let block_index = ledger
         .burn(amount, ckdoge_acc, Memo(ByteBuf::from(memo)))
         .await?;
 
@@ -461,16 +472,21 @@ pub async fn burn_ckdoge(
         let mut m = r.borrow_mut();
         // mark utxos as used
         for utxo in utxos.iter() {
-            m.insert(utxo.0.clone(), (utxo.1, blk, 0));
+            m.insert(utxo.0.clone(), (utxo.1, block_index, 0));
         }
     });
 
-    match burn_utxos(blk, receiver.clone(), amount, fee_rate, utxos).await {
+    match burn_utxos(block_index, receiver.clone(), amount, fee_rate, utxos).await {
         Ok(res) => Ok(res),
         Err(err) => {
             state::with_mut(|s| {
-                s.utxos_retry_burning_queue
-                    .push_back((blk, receiver.into(), amount, fee_rate, 0));
+                s.utxos_retry_burning_queue.push_back((
+                    block_index,
+                    receiver.into(),
+                    amount,
+                    fee_rate,
+                    0,
+                ));
             });
 
             // retry burn utxos after 30 seconds
@@ -483,34 +499,94 @@ pub async fn burn_ckdoge(
     }
 }
 
+pub fn list_minted_utxos(caller: Principal) -> Vec<types::MintedUtxo> {
+    MINTED_UTXOS.with(|r| {
+        r.borrow()
+            .get(&caller)
+            .map_or_else(Vec::new, |utxos| utxos.into())
+    })
+}
+
+pub fn list_collected_utxos(start_height: u64, take: usize) -> Vec<types::CollectedUtxo> {
+    let mut res: Vec<types::CollectedUtxo> = Vec::new();
+    COLLECTED_UTXOS_HEAP.with(|r| {
+        for (k, v) in r.borrow().range(ops::RangeFrom {
+            start: UtxoState(start_height, Default::default(), 0, 0),
+        }) {
+            res.push(types::CollectedUtxo {
+                principal: v.0,
+                block_index: v.1,
+                height: v.2,
+                utxo: k.clone().into(),
+            });
+
+            if res.len() >= take {
+                break;
+            }
+        }
+        res
+    })
+}
+
+pub fn list_burned_utxos(start_index: u64, take: usize) -> Vec<types::BurnedUtxos> {
+    let mut res: Vec<types::BurnedUtxos> = Vec::new();
+    BURNED_UTXOS.with(|r| {
+        for (k, v) in r.borrow().range(ops::RangeFrom { start: start_index }) {
+            res.push(types::BurnedUtxos {
+                block_index: k,
+                txid: v.0 .2,
+                height: v.0 .3,
+                address: v.0 .1,
+                utxos: v.0 .0.into_iter().map(|(utxo, _)| utxo.into()).collect(),
+            });
+
+            if res.len() >= take {
+                break;
+            }
+        }
+        res
+    })
+}
+
 // we can retry burn utxos if it failed in the previous burn_ckdoge call
 pub async fn retry_burn_utxos() {
-    if let Some((blk, receiver, amount, fee_rate, retry)) =
+    if let Some((block_index, receiver, amount, fee_rate, retry)) =
         state::with_mut(|s| s.utxos_retry_burning_queue.pop_front())
     {
         ic_cdk::print(format!(
-            "retry burn utxos after 30 seconds, block index: {blk}, receiver: {receiver:?}, amount: {amount}"
+            "retry burn utxos after 30 seconds, block index: {block_index}, receiver: {receiver:?}, amount: {amount}"
         ));
 
         let utxos = COLLECTED_UTXOS_HEAP.with(|r| {
             let m = r.borrow();
             let mut utxos: Vec<(UtxoState, Principal)> = vec![];
             for (utxo, v) in m.iter() {
-                if v.1 == blk && v.2 == 0 {
+                if v.1 == block_index && v.2 == 0 {
                     utxos.push((utxo.clone(), v.0));
                 }
             }
             utxos
         });
 
-        if burn_utxos(blk, receiver.clone().into(), amount, fee_rate, utxos)
-            .await
-            .is_err()
+        if burn_utxos(
+            block_index,
+            receiver.clone().into(),
+            amount,
+            fee_rate,
+            utxos,
+        )
+        .await
+        .is_err()
             && retry < 3
         {
             state::with_mut(|s| {
-                s.utxos_retry_burning_queue
-                    .push_back((blk, receiver, amount, fee_rate, retry + 1));
+                s.utxos_retry_burning_queue.push_back((
+                    block_index,
+                    receiver,
+                    amount,
+                    fee_rate,
+                    retry + 1,
+                ));
             });
         }
 
@@ -537,25 +613,69 @@ pub async fn collect_and_clear_utxos() -> Result<u64, String> {
         let mut m = r.borrow_mut();
         let mut total: u64 = 0;
         for utxo in res.utxos {
-            let utxo = UtxoState(utxo.height, utxo.txid.0, utxo.vout, utxo.value);
-            if !m.contains_key(&utxo) {
-                total += utxo.3;
-                m.insert(utxo, (minter, 0, 0));
-            }
+            m.entry(UtxoState(utxo.height, utxo.txid.0, utxo.vout, utxo.value))
+                .or_insert_with(|| {
+                    total += utxo.value;
+                    (minter, 0, 0)
+                });
         }
 
         // remove retrieved utxos in previous burned
-        m.retain(|_, v| v.2 == 0 || v.2 >= confirmed_height);
+        m.retain(|_, v| v.2 <= 1 || v.2 >= confirmed_height.saturating_sub(100));
         Ok(total)
     })
 }
 
-pub fn list_minted_utxos(caller: Principal) -> Vec<types::MintedUtxo> {
-    MINTED_UTXOS.with(|r| {
-        r.borrow()
-            .get(&caller)
-            .map_or_else(Vec::new, |utxos| utxos.into())
-    })
+pub async fn finalize_burning() -> Result<bool, String> {
+    let mut has_more = false;
+    if let Some((block_index, ts)) = state::with(|s| s.unconfirmed_burning_utxos.front().copied()) {
+        let ts_ms = ic_cdk::api::time() / MILLISECONDS;
+        if ts_ms.saturating_sub(ts) < 10_000 {
+            return Ok(false);
+        }
+
+        has_more = state::with_mut(|s| {
+            s.unconfirmed_burning_utxos.pop_front();
+            s.unconfirmed_burning_utxos
+                .front()
+                .map(|v| ts_ms.saturating_sub(v.1) >= 10_000)
+                .unwrap_or_default()
+        });
+
+        if let Some(mut bu) = BURNED_UTXOS.with(|r| r.borrow().get(&block_index)) {
+            let chain = state::with(|s| s.get_chain())?;
+            match chain.get_tx_block_height(&bu.0 .2).await? {
+                Some(tx_block_height) => {
+                    if bu.0 .3 != tx_block_height {
+                        bu.0 .3 = tx_block_height;
+                        COLLECTED_UTXOS_HEAP.with(|r| {
+                            let mut m = r.borrow_mut();
+                            // mark utxos as burned
+                            for utxo in bu.0 .0.iter() {
+                                m.insert(utxo.0.clone(), (utxo.1, block_index, tx_block_height));
+                            }
+                        });
+
+                        BURNED_UTXOS.with(|r| r.borrow_mut().insert(block_index, bu));
+                        // check again after some rounds for reorg
+                        state::with_mut(|s| {
+                            s.unconfirmed_burning_utxos.push_back((block_index, ts_ms))
+                        });
+                    }
+                }
+                None => {
+                    if bu.0 .3 == 0 {
+                        state::with_mut(|s| {
+                            s.unconfirmed_burning_utxos.push_front((block_index, ts_ms))
+                        });
+                        return Ok(false);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(has_more)
 }
 
 async fn burn_utxos(
@@ -630,19 +750,22 @@ async fn burn_utxos(
 
     COLLECTED_UTXOS_HEAP.with(|r| {
         let mut m = r.borrow_mut();
-        // mark utxos as burned
+        // mark utxos in burning
         for utxo in utxos.iter() {
-            // TODO: use spent height
-            m.insert(utxo.0.clone(), (utxo.1, block_index, res.tip_height));
+            m.insert(utxo.0.clone(), (utxo.1, block_index, 1));
         }
     });
 
-    let burned_at = ic_cdk::api::time() / MILLISECONDS;
     BURNED_UTXOS.with(|r| {
         r.borrow_mut().insert(
             block_index,
-            BurnedUtxo((utxos, receiver.into(), res.txid.clone(), burned_at)),
+            BurnedUtxos((utxos, receiver.into(), res.txid.clone(), 0)),
         );
+    });
+
+    state::with_mut(|s| {
+        s.unconfirmed_burning_utxos
+            .push_back((block_index, ic_cdk::api::time() / MILLISECONDS));
     });
 
     Ok(res)
