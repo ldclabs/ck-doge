@@ -156,6 +156,13 @@ pub struct UnspentTx {
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
+pub struct TxStatus {
+    pub height: u64, // block height that the Tx was included in
+    pub tip_height: u64,
+    pub confirmed_height: u64,
+}
+
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct BlockRef {
     pub hash: ByteN<32>,
     pub height: u64,
@@ -206,14 +213,10 @@ pub struct UtxosOutput {
 }
 
 /// ByteN<N> is a wrapper around ByteArray<N> to provide CandidType implementation
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Clone, Copy, Default, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 pub struct ByteN<const N: usize>(pub ByteArray<N>);
-
-impl<const N: usize> Default for ByteN<N> {
-    fn default() -> Self {
-        Self(ByteArray::new([0u8; N]))
-    }
-}
 
 impl<const N: usize> CandidType for ByteN<N> {
     fn _ty() -> candid::types::internal::Type {

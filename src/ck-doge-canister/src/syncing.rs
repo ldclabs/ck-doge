@@ -52,7 +52,8 @@ pub async fn fetch_block() {
             tip_height + 1
         };
 
-        let key = format!("blk-{height}");
+        let ts = ic_cdk::api::time() / SECONDS;
+        let key = format!("blk-{height}-{ts}");
         let blockhash = DogecoinRPC::get_blockhash(&agent, key.clone(), height)
             .await
             .map_err(FetchBlockError::ShouldWait)?;

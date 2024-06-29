@@ -630,7 +630,7 @@ pub async fn finalize_burning() -> Result<bool, String> {
     let mut has_more = false;
     if let Some((block_index, ts)) = state::with(|s| s.unconfirmed_burning_utxos.front().copied()) {
         let ts_ms = ic_cdk::api::time() / MILLISECONDS;
-        if ts_ms.saturating_sub(ts) < 10_000 {
+        if ts_ms.saturating_sub(ts) < 60_000 {
             return Ok(false);
         }
 
@@ -638,21 +638,21 @@ pub async fn finalize_burning() -> Result<bool, String> {
             s.unconfirmed_burning_utxos.pop_front();
             s.unconfirmed_burning_utxos
                 .front()
-                .map(|v| ts_ms.saturating_sub(v.1) >= 10_000)
+                .map(|v| ts_ms.saturating_sub(v.1) >= 60_000)
                 .unwrap_or_default()
         });
 
         if let Some(mut bu) = BURNED_UTXOS.with(|r| r.borrow().get(&block_index)) {
             let chain = state::with(|s| s.get_chain())?;
-            match chain.get_tx_block_height(&bu.0 .2).await? {
-                Some(tx_block_height) => {
-                    if bu.0 .3 != tx_block_height {
-                        bu.0 .3 = tx_block_height;
+            match chain.get_tx_status(&bu.0 .2).await? {
+                Some(status) => {
+                    if bu.0 .3 != status.height {
+                        bu.0 .3 = status.height;
                         COLLECTED_UTXOS_HEAP.with(|r| {
                             let mut m = r.borrow_mut();
                             // mark utxos as burned
                             for utxo in bu.0 .0.iter() {
-                                m.insert(utxo.0.clone(), (utxo.1, block_index, tx_block_height));
+                                m.insert(utxo.0.clone(), (utxo.1, block_index, status.height));
                             }
                         });
 
@@ -666,7 +666,7 @@ pub async fn finalize_burning() -> Result<bool, String> {
                 None => {
                     if bu.0 .3 == 0 {
                         state::with_mut(|s| {
-                            s.unconfirmed_burning_utxos.push_front((block_index, ts_ms))
+                            s.unconfirmed_burning_utxos.push_back((block_index, ts_ms))
                         });
                         return Ok(false);
                     }

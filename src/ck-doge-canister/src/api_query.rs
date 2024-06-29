@@ -106,8 +106,14 @@ fn get_utx_b(txid: ByteN<32>) -> Option<UnspentTx> {
 }
 
 #[ic_cdk::query]
-fn get_tx_block_height(txid: ByteN<32>) -> Option<u64> {
-    store::get_tx_block_height(&txid)
+fn get_tx_status(txid: ByteN<32>) -> Option<TxStatus> {
+    store::get_tx_block_height(&txid).map(|height| {
+        store::state::with(|s| TxStatus {
+            height,
+            tip_height: s.tip_height,
+            confirmed_height: s.confirmed_height,
+        })
+    })
 }
 
 #[ic_cdk::query]
