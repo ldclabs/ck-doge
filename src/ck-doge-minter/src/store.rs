@@ -22,7 +22,6 @@ use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet, VecDeque},
     ops,
-    time::Duration,
 };
 
 use crate::{
@@ -58,9 +57,14 @@ pub struct State {
 
     pub managers: BTreeSet<Principal>,
 
-    // VecDeque<(block_index, receiver, amount, fee_rate, retry)>
     #[serde(default)]
-    pub utxos_retry_burning_queue: VecDeque<(u64, canister::Address, u64, u64, u8)>,
+    pub tokens_minted_count: u64,
+    #[serde(default)]
+    pub tokens_burned_count: u64,
+
+    // BTreeMap<block_index, (receiver, amount, fee_rate, error)>
+    #[serde(default)]
+    pub burning_utxos: BTreeMap<u64, (Principal, canister::Address, u64, u64, String)>,
 
     // VecDeque<(block_index, timestamp_ms)>
     #[serde(default)]
@@ -385,6 +389,10 @@ pub async fn mint_ckdoge(caller: Principal) -> Result<u64, String> {
     }
     .await;
 
+    state::with_mut(|s| {
+        s.tokens_minted_count = s.tokens_minted_count.saturating_add(1);
+    });
+
     match res {
         Ok(_) => Ok(total_amount),
         Err(err) => {
@@ -406,7 +414,7 @@ pub async fn burn_ckdoge(
     address: String,
     amount: u64,
     fee_rate: u64,
-) -> Result<canister::SendTxOutput, String> {
+) -> Result<types::BurnOutput, String> {
     if amount < DUST_LIMIT * 10 {
         return Err("amount is too small".to_string());
     }
@@ -466,6 +474,7 @@ pub async fn burn_ckdoge(
 
     state::with_mut(|s| {
         s.tokens_burned = s.tokens_burned.saturating_add(amount);
+        s.tokens_burned_count = s.tokens_burned_count.saturating_add(1);
     });
 
     COLLECTED_UTXOS_HEAP.with(|r| {
@@ -476,25 +485,96 @@ pub async fn burn_ckdoge(
         }
     });
 
-    match burn_utxos(block_index, receiver.clone(), amount, fee_rate, utxos).await {
-        Ok(res) => Ok(res),
+    state::with_mut(|s| {
+        s.burning_utxos.insert(
+            block_index,
+            (
+                caller,
+                receiver.clone().into(),
+                amount,
+                fee_rate,
+                "".to_string(),
+            ),
+        )
+    });
+
+    match burn_utxos(block_index, receiver, amount, fee_rate, utxos).await {
+        Ok(res) => {
+            state::with_mut(|s| s.burning_utxos.remove(&block_index));
+
+            Ok(types::BurnOutput {
+                block_index,
+                txid: res.txid,
+                tip_height: res.tip_height,
+                instructions: ic_cdk::api::performance_counter(1),
+            })
+        }
         Err(err) => {
             state::with_mut(|s| {
-                s.utxos_retry_burning_queue.push_back((
-                    block_index,
-                    receiver.into(),
-                    amount,
-                    fee_rate,
-                    0,
-                ));
+                s.burning_utxos
+                    .entry(block_index)
+                    .and_modify(|v| v.4.clone_from(&err));
             });
+            Err(format!(
+                "burn_utxos failed: {err}, block_index: {block_index}"
+            ))
+        }
+    }
+}
 
-            // retry burn utxos after 30 seconds
-            ic_cdk_timers::set_timer(
-                Duration::from_secs(30),
-                || ic_cdk::spawn(retry_burn_utxos()),
-            );
-            Err(err)
+// we can retry burn utxos if it failed in the previous burn_ckdoge call
+pub async fn retry_burn_utxos(
+    block_index: u64,
+    new_fee_rate: Option<u64>,
+    caller: Option<Principal>,
+) -> Result<types::BurnOutput, String> {
+    let (owner, receiver, amount, fee_rate, _) =
+        state::with(|s| s.burning_utxos.get(&block_index).cloned())
+            .ok_or_else(|| format!("no burning utxos found for block_index: {block_index}"))?;
+
+    if let Some(caller) = caller {
+        if caller != owner {
+            return Err("caller is not the owner of the burning utxos".to_string());
+        }
+    }
+
+    let new_fee_rate = new_fee_rate.unwrap_or(fee_rate);
+
+    let utxos = COLLECTED_UTXOS_HEAP.with(|r| {
+        let m = r.borrow();
+        let mut utxos: Vec<(UtxoState, Principal)> = vec![];
+        for (utxo, v) in m.iter() {
+            if v.1 == block_index && v.2 == 0 {
+                utxos.push((utxo.clone(), v.0));
+            }
+        }
+        utxos
+    });
+
+    if utxos.is_empty() {
+        return Err(format!("no utxos found for block_index: {block_index}"));
+    }
+
+    match burn_utxos(block_index, receiver.into(), amount, new_fee_rate, utxos).await {
+        Ok(res) => {
+            state::with_mut(|s| s.burning_utxos.remove(&block_index));
+
+            Ok(types::BurnOutput {
+                block_index,
+                txid: res.txid,
+                tip_height: res.tip_height,
+                instructions: ic_cdk::api::performance_counter(1),
+            })
+        }
+        Err(err) => {
+            state::with_mut(|s| {
+                s.burning_utxos
+                    .entry(block_index)
+                    .and_modify(|v| v.4.clone_from(&err));
+            });
+            Err(format!(
+                "burn_utxos failed: {err}, block_index: {block_index}"
+            ))
         }
     }
 }
@@ -546,56 +626,6 @@ pub fn list_burned_utxos(start_index: u64, take: usize) -> Vec<types::BurnedUtxo
         }
         res
     })
-}
-
-// we can retry burn utxos if it failed in the previous burn_ckdoge call
-pub async fn retry_burn_utxos() {
-    if let Some((block_index, receiver, amount, fee_rate, retry)) =
-        state::with_mut(|s| s.utxos_retry_burning_queue.pop_front())
-    {
-        ic_cdk::print(format!(
-            "retry burn utxos after 30 seconds, block index: {block_index}, receiver: {receiver:?}, amount: {amount}"
-        ));
-
-        let utxos = COLLECTED_UTXOS_HEAP.with(|r| {
-            let m = r.borrow();
-            let mut utxos: Vec<(UtxoState, Principal)> = vec![];
-            for (utxo, v) in m.iter() {
-                if v.1 == block_index && v.2 == 0 {
-                    utxos.push((utxo.clone(), v.0));
-                }
-            }
-            utxos
-        });
-
-        if burn_utxos(
-            block_index,
-            receiver.clone().into(),
-            amount,
-            fee_rate,
-            utxos,
-        )
-        .await
-        .is_err()
-            && retry < 3
-        {
-            state::with_mut(|s| {
-                s.utxos_retry_burning_queue.push_back((
-                    block_index,
-                    receiver,
-                    amount,
-                    fee_rate,
-                    retry + 1,
-                ));
-            });
-        }
-
-        // retry burn utxos after 30 seconds
-        ic_cdk_timers::set_timer(
-            Duration::from_secs(30),
-            || ic_cdk::spawn(retry_burn_utxos()),
-        );
-    }
 }
 
 pub async fn collect_and_clear_utxos() -> Result<u64, String> {

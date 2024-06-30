@@ -1,6 +1,6 @@
 use candid::{CandidType, Principal};
 use dogecoin::canister;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{
     is_authenticated, is_controller_or_manager, minter_account, store, types, user_account,
@@ -17,6 +17,8 @@ pub struct State {
 
     pub tokens_minted: u64,
     pub tokens_burned: u64,
+    pub tokens_minted_count: u64,
+    pub tokens_burned_count: u64,
     pub accounts: u64,
     pub collected_utxos: u64,
     pub burned_utxos: u64,
@@ -25,7 +27,7 @@ pub struct State {
     pub managers: BTreeSet<Principal>,
     // manager info
     pub ecdsa_key_name: Option<String>,
-    pub utxos_retry_burning_queue: Vec<(u64, canister::Address, u64, u64, u8)>,
+    pub burning_utxos: BTreeMap<u64, (Principal, canister::Address, u64, u64, String)>,
     pub minter_address: Option<String>,
     pub minter_subaddress: Option<String>,
 }
@@ -37,6 +39,8 @@ fn get_state() -> Result<State, ()> {
             chain: s.chain_params().chain_name.to_string(),
             tokens_minted: s.tokens_minted,
             tokens_burned: s.tokens_burned,
+            tokens_minted_count: s.tokens_minted_count,
+            tokens_burned_count: s.tokens_burned_count,
             accounts: store::state::get_accounts_len(),
             collected_utxos: store::state::get_collected_utxos_len(),
             burned_utxos: store::state::get_burned_utxos_len(),
@@ -48,7 +52,7 @@ fn get_state() -> Result<State, ()> {
 
         if is_controller_or_manager().is_ok() {
             res.ecdsa_key_name = Some(s.ecdsa_key_name.clone());
-            res.utxos_retry_burning_queue = s.utxos_retry_burning_queue.clone().into();
+            res.burning_utxos = s.burning_utxos.clone();
             res.minter_address = s.get_address(&minter_account()).map(|v| v.to_string()).ok();
             res.minter_subaddress = s
                 .get_address(&user_account(&ic_cdk::id()))

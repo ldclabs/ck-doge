@@ -15,9 +15,9 @@ mod api_query;
 mod api_update;
 mod chain;
 mod ecdsa;
-mod job;
 mod ledger;
 mod store;
+mod task;
 mod types;
 
 static ANONYMOUS: Principal = Principal::anonymous();

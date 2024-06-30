@@ -1,6 +1,7 @@
 type BurnInput = record { fee_rate : nat64; address : text; amount : nat64 };
 type BurnOutput = record {
   tip_height : nat64;
+  block_index : nat64;
   txid : blob;
   instructions : nat64;
 };
@@ -37,10 +38,15 @@ type Result_3 = variant { Ok : State; Err };
 type Result_4 = variant { Ok : vec MintedUtxo; Err : text };
 type Result_5 = variant { Ok : MintOutput; Err : text };
 type State = record {
+  tokens_minted_count : nat64;
   ecdsa_key_name : opt text;
   managers : vec principal;
+  burning_utxos : vec record {
+    nat64;
+    record { principal; blob; nat64; nat64; text };
+  };
   chain : text;
-  utxos_retry_burning_queue : vec record { nat64; blob; nat64; nat64; nat8 };
+  tokens_burned_count : nat64;
   collected_utxos : nat64;
   tokens_burned : nat64;
   accounts : nat64;
@@ -66,5 +72,6 @@ service : (opt MinterArgs) -> {
   list_collected_utxos : (nat64, nat16) -> (vec CollectedUtxo) query;
   list_minted_utxos : (opt principal) -> (Result_4) query;
   mint_ckdoge : () -> (Result_5);
+  retry_burn_ckdoge : (nat64, opt nat64) -> (Result_1);
   validate_admin_set_managers : (vec principal) -> (Result);
 }

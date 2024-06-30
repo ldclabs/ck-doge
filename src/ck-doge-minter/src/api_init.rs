@@ -2,7 +2,7 @@ use candid::{CandidType, Principal};
 use serde::Deserialize;
 use std::time::Duration;
 
-use crate::{job, store};
+use crate::{store, task};
 
 #[derive(Clone, Debug, CandidType, Deserialize)]
 pub enum MinterArgs {
@@ -40,12 +40,12 @@ fn init(args: Option<MinterArgs>) {
         ic_cdk::spawn(store::state::init_ecdsa_public_key())
     });
 
-    ic_cdk_timers::set_timer_interval(Duration::from_secs(job::FINALIZE_BURNING_INTERVAL), || {
-        ic_cdk::spawn(job::finalize_burning())
+    ic_cdk_timers::set_timer_interval(Duration::from_secs(task::FINALIZE_BURNING_INTERVAL), || {
+        ic_cdk::spawn(task::finalize_burning())
     });
 
-    ic_cdk_timers::set_timer_interval(Duration::from_secs(job::CLEAR_UTXOS_INTERVAL), || {
-        ic_cdk::spawn(job::collect_and_clear_utxos())
+    ic_cdk_timers::set_timer_interval(Duration::from_secs(task::CLEAR_UTXOS_INTERVAL), || {
+        ic_cdk::spawn(task::collect_and_clear_utxos())
     });
 }
 
@@ -83,11 +83,11 @@ fn post_upgrade(args: Option<MinterArgs>) {
         _ => {}
     }
 
-    ic_cdk_timers::set_timer_interval(Duration::from_secs(job::FINALIZE_BURNING_INTERVAL), || {
-        ic_cdk::spawn(job::finalize_burning())
+    ic_cdk_timers::set_timer_interval(Duration::from_secs(task::FINALIZE_BURNING_INTERVAL), || {
+        ic_cdk::spawn(task::finalize_burning())
     });
 
-    ic_cdk_timers::set_timer_interval(Duration::from_secs(job::CLEAR_UTXOS_INTERVAL), || {
-        ic_cdk::spawn(job::collect_and_clear_utxos())
+    ic_cdk_timers::set_timer_interval(Duration::from_secs(task::CLEAR_UTXOS_INTERVAL), || {
+        ic_cdk::spawn(task::collect_and_clear_utxos())
     });
 }

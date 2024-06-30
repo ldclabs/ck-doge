@@ -47,6 +47,7 @@ pub struct BurnInput {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct BurnOutput {
+    pub block_index: u64,
     pub txid: Txid,
     pub tip_height: u64,
     pub instructions: u64,
