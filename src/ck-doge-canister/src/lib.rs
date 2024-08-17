@@ -1,6 +1,7 @@
 use candid::Principal;
 use dogecoin::canister;
 use dogecoin::canister::*;
+use serde_bytes::ByteArray;
 use std::collections::BTreeSet;
 
 use crate::api_init::ChainArgs;

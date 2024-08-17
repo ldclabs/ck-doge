@@ -1,15 +1,15 @@
 # CK-Doge
-Chain-key Dogecoin (CK-Doge) offers on-chain integration with the Dogecoin network on [the Internet Computer (ICP)](https://internetcomputer.org/).
+🐶 Chain-key Dogecoin (CK-Doge) offers on-chain integration with the Dogecoin network on [the Internet Computer (ICP)](https://internetcomputer.org/).
 
 `ckDOGE` is an ICRC-2-compliant token, supported by the CK-Doge canisters, and is backed 1:1 by DOGE.
 
 ## Packages
 
-| Package                                                                               |                                            Crates.io                                            |                                  Documentation                                   |                               Description                                |
-| ------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------: | :----------------------------------------------------------------------: |
+| Package                                                                               |                                            Crates.io                                            |                                  Documentation                                   | Description                                                              |
+| ------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------: | :----------------------------------------------------------------------- |
 | [dogecoin](https://github.com/ldclabs/ck-doge/tree/main/src/dogecoin)                 | [![crates.io](https://img.shields.io/crates/v/dogecoin.svg)](https://crates.io/crates/dogecoin) | [![Documentation](https://docs.rs/dogecoin/badge.svg)](https://docs.rs/dogecoin) | General purpose rust library for using and interoperating with Dogecoin. |
-| [CK-Doge Canister](https://github.com/ldclabs/ck-doge/tree/main/src/ck-doge-canister) |                                                -                                                |                                        -                                         |        Interact with Dogecoin network from the Internet Computer.        |
-| [CK-Doge Minter](https://github.com/ldclabs/ck-doge/tree/main/src/ck-doge-minter)     |                                                -                                                |                                        -                                         |       Mint and burn `ckDOGE` <-> `DOGE` on the Internet Computer.        |
+| [CK-Doge Canister](https://github.com/ldclabs/ck-doge/tree/main/src/ck-doge-canister) |                                                -                                                |                                        -                                         | Interact with Dogecoin network from the Internet Computer.               |
+| [CK-Doge Minter](https://github.com/ldclabs/ck-doge/tree/main/src/ck-doge-minter)     |                                                -                                                |                                        -                                         | Mint and burn `ckDOGE` <-> `DOGE` on the Internet Computer.              |
 
 ## Overview
 

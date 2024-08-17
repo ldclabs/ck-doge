@@ -154,10 +154,10 @@ impl DogecoinRPC {
         params: &[Value],
     ) -> Result<T, String> {
         let input = RPCRequest {
-            jsonrpc: "1.0",
+            jsonrpc: "2.0",
             method,
             params,
-            id: 0,
+            id: 1,
         };
         let input = to_vec(&input).map_err(err_string)?;
         let data = agent.post(idempotency_key, input).await?;

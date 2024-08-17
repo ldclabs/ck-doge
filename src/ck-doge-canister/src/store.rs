@@ -12,7 +12,7 @@ use ic_stable_structures::{
     DefaultMemoryImpl, StableBTreeMap, StableCell, Storable,
 };
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
+use serde_bytes::{ByteArray, ByteBuf};
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -46,25 +46,25 @@ pub struct State {
     pub min_confirmations: u32,
 
     pub tip_height: u64,
-    pub tip_blockhash: ByteN<32>,
+    pub tip_blockhash: ByteArray<32>,
 
     pub processed_height: u64,
-    pub processed_blockhash: ByteN<32>,
+    pub processed_blockhash: ByteArray<32>,
 
     pub confirmed_height: u64,
-    pub confirmed_blockhash: ByteN<32>,
+    pub confirmed_blockhash: ByteArray<32>,
 
     pub start_height: u64,
-    pub start_blockhash: ByteN<32>,
+    pub start_blockhash: ByteArray<32>,
 
     pub last_errors: VecDeque<String>,
 
     pub managers: BTreeSet<Principal>,
     pub rpc_agents: Vec<RPCAgent>,
 
-    pub unconfirmed_utxs: BTreeMap<ByteN<32>, UnspentTxState>,
-    pub unconfirmed_utxos: BTreeMap<ByteN<21>, (UtxoStates, SpentUtxos)>,
-    processed_blocks: VecDeque<(u64, ByteN<32>)>,
+    pub unconfirmed_utxs: BTreeMap<ByteArray<32>, UnspentTxState>,
+    pub unconfirmed_utxos: BTreeMap<ByteArray<21>, (UtxoStates, SpentUtxos)>,
+    processed_blocks: VecDeque<(u64, ByteArray<32>)>,
 }
 
 impl State {
@@ -125,7 +125,7 @@ impl Storable for UnspentTxState {
 
 // address -> UnspentOutput
 #[derive(Clone, Default, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UtxoState(pub u64, pub ByteN<32>, pub u32, pub u64);
+pub struct UtxoState(pub u64, pub ByteArray<32>, pub u32, pub u64);
 impl Storable for UtxoState {
     const BOUND: Bound = Bound::Bounded {
         max_size: 58,
@@ -498,21 +498,21 @@ pub fn confirm_utxos() -> Result<bool, String> {
     })
 }
 
-pub fn get_utx(txid: &ByteN<32>) -> Option<UnspentTx> {
+pub fn get_utx(txid: &ByteArray<32>) -> Option<UnspentTx> {
     state::with(|s| match s.unconfirmed_utxs.get(txid) {
         Some(utx) => Some(UnspentTx::from(utx.clone())),
         None => UTXS.with(|r| r.borrow().get(txid).map(UnspentTx::from)),
     })
 }
 
-pub fn get_tx_block_height(txid: &ByteN<32>) -> Option<u64> {
+pub fn get_tx_block_height(txid: &ByteArray<32>) -> Option<u64> {
     state::with(|s| match s.unconfirmed_utxs.get(txid) {
         Some(utx) => Some(utx.0),
         None => UTXS.with(|r| r.borrow().get(txid).map(|utx| utx.0)),
     })
 }
 
-pub fn get_balance(addr: &ByteN<21>) -> u64 {
+pub fn get_balance(addr: &ByteArray<21>) -> u64 {
     let mut res = UTXOS.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     state::with(|s| {
         if let Some((uts, sts)) = s.unconfirmed_utxos.get(addr) {
@@ -525,7 +525,7 @@ pub fn get_balance(addr: &ByteN<21>) -> u64 {
     res.into_iter().map(|v| v.3).sum()
 }
 
-pub fn list_utxos(addr: &ByteN<21>, take: usize, confirmed: bool) -> Vec<Utxo> {
+pub fn list_utxos(addr: &ByteArray<21>, take: usize, confirmed: bool) -> Vec<Utxo> {
     let mut res = UTXOS.with(|r| r.borrow().get(addr).unwrap_or_default()).0;
     if !confirmed {
         state::with(|s| {
@@ -542,8 +542,8 @@ pub fn list_utxos(addr: &ByteN<21>, take: usize, confirmed: bool) -> Vec<Utxo> {
 }
 
 fn process_spent_tx(
-    unconfirmed_utxs: &mut BTreeMap<ByteN<32>, UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<ByteN<21>, (UtxoStates, SpentUtxos)>,
+    unconfirmed_utxs: &mut BTreeMap<ByteArray<32>, UnspentTxState>,
+    unconfirmed_utxos: &mut BTreeMap<ByteArray<21>, (UtxoStates, SpentUtxos)>,
     utm: &StableBTreeMap<[u8; 32], UnspentTxState, Memory>,
     chain: &ChainParams,
     tx: &transaction::Transaction,
@@ -551,7 +551,7 @@ fn process_spent_tx(
     height: u64,
 ) -> Result<(), String> {
     for txin in tx.input.iter() {
-        let previd: ByteN<32> = (*txin.prevout.txid).into();
+        let previd: ByteArray<32> = (*txin.prevout.txid).into();
         if let std::collections::btree_map::Entry::Vacant(e) = unconfirmed_utxs.entry(previd) {
             if let Some(utx) = utm.get(&previd) {
                 // load unspent tx from stable storage
@@ -569,7 +569,7 @@ fn process_spent_tx(
 
             // move spent utxo
             if let Some(addr) = addr {
-                let addr: ByteN<21> = addr.0.into();
+                let addr: ByteArray<21> = addr.0.into();
                 let utxo = UtxoState(utx.0, previd, txin.prevout.vout, txout.value);
                 match unconfirmed_utxos.get_mut(&addr) {
                     Some((uts, sts)) => {
@@ -599,8 +599,8 @@ fn process_spent_tx(
 }
 
 fn add_unspent_txouts(
-    unconfirmed_utxs: &mut BTreeMap<ByteN<32>, UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<ByteN<21>, (UtxoStates, SpentUtxos)>,
+    unconfirmed_utxs: &mut BTreeMap<ByteArray<32>, UnspentTxState>,
+    unconfirmed_utxos: &mut BTreeMap<ByteArray<21>, (UtxoStates, SpentUtxos)>,
     chain: &ChainParams,
     tx: &transaction::Transaction,
     txid: Txid,
@@ -622,7 +622,7 @@ fn add_unspent_txouts(
         let (_, addr) = script::classify_script(txout.script_pubkey.as_bytes(), chain);
 
         if let Some(addr) = addr {
-            let addr: ByteN<21> = addr.0.into();
+            let addr: ByteArray<21> = addr.0.into();
             let utxo = UtxoState(height, txid.0, vout as u32, txout.value);
             match unconfirmed_utxos.get_mut(&addr) {
                 Some((uts, _sts)) => {
@@ -645,13 +645,13 @@ fn add_unspent_txouts(
 }
 
 fn flush_confirmed_utxos(
-    unconfirmed_utxs: &mut BTreeMap<ByteN<32>, UnspentTxState>,
-    unconfirmed_utxos: &mut BTreeMap<ByteN<21>, (UtxoStates, SpentUtxos)>,
+    unconfirmed_utxs: &mut BTreeMap<ByteArray<32>, UnspentTxState>,
+    unconfirmed_utxos: &mut BTreeMap<ByteArray<21>, (UtxoStates, SpentUtxos)>,
     utm: &mut StableBTreeMap<[u8; 32], UnspentTxState, Memory>,
     xom: &mut StableBTreeMap<[u8; 21], UtxoStates, Memory>,
     confirmed_height: u64,
 ) -> Result<(), String> {
-    let confirmed_txids: Vec<ByteN<32>> = unconfirmed_utxs
+    let confirmed_txids: Vec<ByteArray<32>> = unconfirmed_utxs
         .iter()
         .filter_map(|(txid, utx)| {
             // remove the tx if all outputs are spent
@@ -684,7 +684,7 @@ fn flush_confirmed_utxos(
         unconfirmed_utxs.remove(&txid);
     }
 
-    let empty_addrs: Vec<ByteN<21>> = unconfirmed_utxos
+    let empty_addrs: Vec<ByteArray<21>> = unconfirmed_utxos
         .iter_mut()
         .filter_map(|(addr, (uts, sts))| {
             let mut confirmed_utxos: BTreeSet<UtxoState> = BTreeSet::new();

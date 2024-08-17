@@ -1,6 +1,3 @@
-use std::ops::Deref;
-
-use crate::{script, transaction};
 use bitcoin::hashes::{sha256d, Hash};
 use candid::CandidType;
 use serde::{Deserialize, Serialize};
@@ -11,8 +8,10 @@ mod agent;
 
 pub use agent::*;
 
+use crate::{script, transaction};
+
 #[derive(CandidType, Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Txid(pub ByteN<32>);
+pub struct Txid(pub ByteArray<32>);
 
 impl std::str::FromStr for Txid {
     type Err = String;
@@ -29,15 +28,9 @@ impl std::fmt::Display for Txid {
     }
 }
 
-impl From<ByteN<32>> for Txid {
-    fn from(val: ByteN<32>) -> Self {
-        Self(val)
-    }
-}
-
 impl From<ByteArray<32>> for Txid {
     fn from(val: ByteArray<32>) -> Self {
-        Self(ByteN(val))
+        Self(val)
     }
 }
 
@@ -60,17 +53,11 @@ impl From<Txid> for transaction::Txid {
 }
 
 #[derive(CandidType, Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Address(pub ByteN<21>);
-
-impl From<ByteN<21>> for Address {
-    fn from(val: ByteN<21>) -> Self {
-        Self(val)
-    }
-}
+pub struct Address(pub ByteArray<21>);
 
 impl From<ByteArray<21>> for Address {
     fn from(val: ByteArray<21>) -> Self {
-        Self(ByteN(val))
+        Self(val)
     }
 }
 
@@ -164,7 +151,7 @@ pub struct TxStatus {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct BlockRef {
-    pub hash: ByteN<32>,
+    pub hash: ByteArray<32>,
     pub height: u64,
 }
 
@@ -176,8 +163,8 @@ pub fn sha3_256(data: &[u8]) -> [u8; 32] {
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct SendTxInput {
-    pub tx: ByteBuf,                        // signed or unsigned transaction
-    pub from_subaccount: Option<ByteN<32>>, // should be None for signed transaction
+    pub tx: ByteBuf,                            // signed or unsigned transaction
+    pub from_subaccount: Option<ByteArray<32>>, // should be None for signed transaction
 }
 
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
@@ -192,7 +179,7 @@ pub struct CreateTxInput {
     pub address: String,
     pub amount: u64,
     pub fee_rate: u64, // units per vByte, should >= 1000
-    pub from_subaccount: Option<ByteN<32>>,
+    pub from_subaccount: Option<ByteArray<32>>,
     pub utxos: Vec<Utxo>, // optional, if not provided, will fetch from the UTXOs indexer
 }
 
@@ -207,71 +194,7 @@ pub struct CreateTxOutput {
 #[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct UtxosOutput {
     pub tip_height: u64,
-    pub tip_blockhash: ByteN<32>,
+    pub tip_blockhash: ByteArray<32>,
     pub confirmed_height: u64,
     pub utxos: Vec<Utxo>,
-}
-
-/// ByteN<N> is a wrapper around ByteArray<N> to provide CandidType implementation
-#[derive(
-    Clone, Copy, Default, Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash,
-)]
-pub struct ByteN<const N: usize>(pub ByteArray<N>);
-
-impl<const N: usize> CandidType for ByteN<N> {
-    fn _ty() -> candid::types::internal::Type {
-        candid::types::internal::TypeInner::Vec(candid::types::internal::TypeInner::Nat8.into())
-            .into()
-    }
-    fn idl_serialize<S>(&self, serializer: S) -> Result<(), S::Error>
-    where
-        S: candid::types::Serializer,
-    {
-        serializer.serialize_blob(self.0.as_slice())
-    }
-}
-
-impl<const N: usize> Deref for ByteN<N> {
-    type Target = [u8; N];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<const N: usize> AsRef<[u8; N]> for ByteN<N> {
-    fn as_ref(&self) -> &[u8; N] {
-        &self.0
-    }
-}
-
-impl<const N: usize> From<[u8; N]> for ByteN<N> {
-    fn from(val: [u8; N]) -> Self {
-        Self(ByteArray::new(val))
-    }
-}
-
-impl<const N: usize> TryFrom<&[u8]> for ByteN<N> {
-    type Error = String;
-
-    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
-        if value.len() != N {
-            return Err(format!("expected {} bytes, got {}", N, value.len()));
-        }
-        let mut bytes = [0u8; N];
-        bytes.copy_from_slice(value);
-        Ok(Self(ByteArray::new(bytes)))
-    }
-}
-
-impl<const N: usize> From<ByteArray<N>> for ByteN<N> {
-    fn from(val: ByteArray<N>) -> Self {
-        Self(val)
-    }
-}
-
-impl<const N: usize> From<ByteN<N>> for ByteArray<N> {
-    fn from(val: ByteN<N>) -> Self {
-        val.0
-    }
 }

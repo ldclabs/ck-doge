@@ -15,7 +15,7 @@ use ic_stable_structures::{
 };
 use icrc_ledger_types::icrc1::transfer::Memo;
 use serde::{Deserialize, Serialize};
-use serde_bytes::ByteBuf;
+use serde_bytes::{ByteArray, ByteBuf};
 use std::str::FromStr;
 use std::{
     borrow::Cow,
@@ -113,7 +113,7 @@ impl Storable for State {
 }
 
 #[derive(Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UtxoState(pub u64, pub canister::ByteN<32>, pub u32, pub u64);
+pub struct UtxoState(pub u64, pub ByteArray<32>, pub u32, pub u64);
 
 impl From<UtxoState> for canister::Utxo {
     fn from(utxo: UtxoState) -> Self {
@@ -850,12 +850,7 @@ mod test {
 
     #[test]
     fn test_bound_max_size() {
-        let v = UtxoState(
-            u64::MAX,
-            canister::ByteN::from([255u8; 32]),
-            u32::MAX,
-            u64::MAX,
-        );
+        let v = UtxoState(u64::MAX, ByteArray::from([255u8; 32]), u32::MAX, u64::MAX);
         let v = v.to_bytes();
         println!(
             "UtxoState max_size: {}, {}",
@@ -864,7 +859,7 @@ mod test {
         );
         // UtxoState max_size: 58, 841bffffffffffffffff5820ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1affffffff1bffffffffffffffff
 
-        let v = UtxoState(0, canister::ByteN::from([0u8; 32]), 0, 0);
+        let v = UtxoState(0, ByteArray::from([0u8; 32]), 0, 0);
         let v = v.to_bytes();
         println!(
             "UtxoState min_size: {}, {}",
