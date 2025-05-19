@@ -2,7 +2,7 @@ use bitcoin::{
     consensus::{encode, Decodable, Encodable},
     VarInt,
 };
-use bitcoin_io::{BufRead, Error, Write};
+use bitcoin_io::{Error, Read, Write};
 
 pub mod amount;
 pub mod block;
@@ -32,7 +32,7 @@ where
 pub fn consensus_decode_from_vec<T, R>(r: &mut R) -> Result<Vec<T>, encode::Error>
 where
     T: Decodable,
-    R: BufRead + ?Sized,
+    R: Read + ?Sized,
 {
     let cap: VarInt = Decodable::consensus_decode(r)?;
     let cap = cap.0 as usize;
