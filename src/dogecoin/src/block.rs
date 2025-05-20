@@ -1,7 +1,7 @@
 use bitcoin::consensus::{encode, Decodable, Encodable};
 use bitcoin::hashes::{hash_newtype, sha256d, Hash};
 use bitcoin::merkle_tree;
-use bitcoin_io::{BufRead, Error, Write};
+use bitcoin_io::{Error, Read, Write};
 use std::ops::Deref;
 
 use crate::transaction::Transaction;
@@ -44,7 +44,7 @@ impl Encodable for BlockHash {
 
 impl Decodable for BlockHash {
     #[inline]
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         let hash: sha256d::Hash = Decodable::consensus_decode_from_finite_reader(r)?;
@@ -76,7 +76,7 @@ impl Encodable for TxMerkleNode {
 
 impl Decodable for TxMerkleNode {
     #[inline]
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         let hash: sha256d::Hash = Decodable::consensus_decode_from_finite_reader(r)?;
@@ -145,7 +145,7 @@ impl Encodable for BlockHeader {
 
 impl Decodable for BlockHeader {
     #[inline]
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         Ok(BlockHeader {
@@ -175,7 +175,7 @@ impl Encodable for MerkleBranch {
 }
 
 impl Decodable for MerkleBranch {
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         Ok(MerkleBranch {
@@ -208,7 +208,7 @@ impl Encodable for MerkleTx {
 
 impl Decodable for MerkleTx {
     #[inline]
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         Ok(MerkleTx {
@@ -266,7 +266,7 @@ impl Encodable for Block {
 }
 
 impl Decodable for Block {
-    fn consensus_decode_from_finite_reader<R: BufRead + ?Sized>(
+    fn consensus_decode_from_finite_reader<R: Read + ?Sized>(
         r: &mut R,
     ) -> Result<Self, encode::Error> {
         let mut blk = Block {
