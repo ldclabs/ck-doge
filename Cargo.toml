@@ -15,7 +15,7 @@ strip = true
 opt-level = 's'
 
 [workspace.package]
-version = "0.5.3"
+version = "0.5.4"
 edition = "2021"
 repository = "https://github.com/ldclabs/ck-doge"
 keywords = ["defi", "dogecoin", "icp", "dapp", "web3"]
@@ -23,24 +23,24 @@ categories = ["encoding", "wasm", "data-structures"]
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-bytes = "1.6"
+bytes = "1"
 serde = "1"
 serde_json = "1"
 serde_bytes = "0.11"
 ciborium = "0.2"
-base64 = "0.21"
+base64 = "0.22"
 sha3 = "0.10"
 bitcoin = { version = "0.32", default-features = false, features = [
   "std",
   "secp-lowmemory",
 ] }
-hex = { package = "hex-conservative", version = "0.2", default-features = false, features = [
+hex = { package = "hex-conservative", version = "0.3", default-features = false, features = [
   "alloc",
 ] }
 async-trait = "0.1"
 candid = "0.10"
-ic-cdk = "0.15"
-ic-cdk-timers = "0.9"
+ic-cdk = "0.17"
+ic-cdk-timers = "0.11"
 ic-stable-structures = "0.6"
 icrc-ledger-types = "0.1"
 num-traits = "0.2"
