@@ -22,7 +22,7 @@ where
     W: Write + ?Sized,
 {
     let mut len = 0;
-    VarInt::from(vv.len()).consensus_encode(w)?;
+    len += VarInt::from(vv.len()).consensus_encode(w)?;
     for v in vv.iter() {
         len += v.consensus_encode(w)?;
     }

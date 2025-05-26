@@ -343,8 +343,8 @@ mod tests {
 
         // println!("Block root: {:?}", blk.auxpow);
 
-        let mut buf = Vec::new();
-        blk.consensus_encode(&mut buf).unwrap();
+        // serialize also asserts len is correct
+        let buf = bitcoin::consensus::encode::serialize(&blk);
         assert_eq!(buf, data);
 
         // println!("Tx 0: {:?}", blk.txdata[0]);
